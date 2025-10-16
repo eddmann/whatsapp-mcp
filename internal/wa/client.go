@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mdp/qrterminal"
+	"github.com/rs/zerolog"
 	"go.mau.fi/whatsmeow"
 	waE2E "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -40,14 +41,38 @@ func New(db *store.DB, baseDir string, logLevel string, appLogger *slog.Logger) 
     }
     // Normalize log level
     lvl := strings.ToUpper(logLevel)
+    var zerologLevel zerolog.Level
     switch lvl {
-    case "DEBUG", "INFO", "WARN", "ERROR":
-        // ok
+    case "DEBUG":
+        zerologLevel = zerolog.DebugLevel
+    case "INFO":
+        zerologLevel = zerolog.InfoLevel
+    case "WARN":
+        zerologLevel = zerolog.WarnLevel
+    case "ERROR":
+        zerologLevel = zerolog.ErrorLevel
     default:
-        lvl = "INFO"
+        zerologLevel = zerolog.InfoLevel
     }
-    waLogger := waLog.Stdout("wa", lvl, true)
-    dbLog := waLog.Stdout("wa-db", lvl, true)
+
+    // Create zerolog loggers that write to stderr
+    waZerolog := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05"}).
+        Level(zerologLevel).
+        With().
+        Timestamp().
+        Str("module", "wa").
+        Logger()
+    dbZerolog := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05"}).
+        Level(zerologLevel).
+        With().
+        Timestamp().
+        Str("module", "wa-db").
+        Logger()
+
+    // Wrap with waLog
+    waLogger := waLog.Zerolog(waZerolog)
+    dbLog := waLog.Zerolog(dbZerolog)
+
     if appLogger == nil {
         appLogger = slog.Default()
     }
@@ -106,7 +131,7 @@ func (c *Client) ConnectWithQR(ctx context.Context) error {
         }
         for evt := range qrChan {
             if evt.Event == "code" {
-                qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
+                qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stderr)
             } else if evt.Event == "success" {
                 break
             }

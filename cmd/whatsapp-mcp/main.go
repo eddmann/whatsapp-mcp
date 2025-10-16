@@ -49,7 +49,7 @@ func main() {
     case "ERROR": slogLevel = slog.LevelError
     default: slogLevel = slog.LevelInfo
     }
-    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel}))
+    logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slogLevel}))
 
 	// Open SQLite store (messages.db)
     db, err := store.Open(dbDir)
