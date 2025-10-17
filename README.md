@@ -17,34 +17,25 @@ All messages and chats are persisted to a local SQLite database with full-text s
 
 ## Prerequisites
 
-- Go 1.24+
-- CGO enabled (required for SQLite)
-- macOS: Xcode Command Line Tools (`xcode-select --install`)
-- ffmpeg (optional but recommended for audio conversion): `brew install ffmpeg`
+- Docker
 
 ## Installation & Setup
 
-### Build from Source
-
 ```bash
-# Clone the repository
-cd whatsapp-mcp
-
-# Build with CGO and FTS5 support
-make build
-
-# Or build manually
-CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mcp
+# Pull the image
+docker pull ghcr.io/eddmann/whatsapp-mcp:latest
 ```
 
 ### First Run - WhatsApp Pairing
 
 ```bash
-# Run the server
-make run
+# Create directory for persistent storage
+mkdir -p whatsapp-store
 
-# Or run the binary directly
-./bin/whatsapp-mcp
+# Run the container (QR code will be displayed)
+docker run -it --rm \
+  -v "$(pwd)/whatsapp-store:/app/store" \
+  ghcr.io/eddmann/whatsapp-mcp:latest
 ```
 
 On first run, a QR code will be displayed in the terminal:
@@ -61,6 +52,8 @@ On first run, a QR code will be displayed in the terminal:
 - Media Downloads: Downloaded media files are organized in `store/<chatJID>/` directories
 - No Re-Authentication: After initial pairing, the server automatically reconnects using stored credentials
 
+> **Important:** Mount a volume to `/app/store` to persist session data and messages across container restarts.
+
 ## Claude Desktop Configuration
 
 Add to your configuration file:
@@ -68,34 +61,51 @@ Add to your configuration file:
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-```json
-{
-  "mcpServers": {
-    "whatsapp": {
-      "command": "/ABSOLUTE/PATH/TO/whatsapp-mcp/bin/whatsapp-mcp"
-    }
-  }
-}
-```
-
-### Optional Environment Variables
-
-You can configure the server with environment variables:
+### Basic Configuration
 
 ```json
 {
   "mcpServers": {
     "whatsapp": {
-      "command": "/ABSOLUTE/PATH/TO/whatsapp-mcp/bin/whatsapp-mcp",
-      "env": {
-        "DB_DIR": "/custom/path/to/storage",
-        "LOG_LEVEL": "DEBUG",
-        "FFMPEG_PATH": "/usr/local/bin/ffmpeg"
-      }
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/ABSOLUTE/PATH/TO/whatsapp-store:/app/store",
+        "ghcr.io/eddmann/whatsapp-mcp:latest"
+      ]
     }
   }
 }
 ```
+
+### With Environment Variables
+
+```json
+{
+  "mcpServers": {
+    "whatsapp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/ABSOLUTE/PATH/TO/whatsapp-store:/app/store",
+        "-e",
+        "LOG_LEVEL=DEBUG",
+        "ghcr.io/eddmann/whatsapp-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+### Available Environment Variables
+
+- `LOG_LEVEL` - Logging level (DEBUG, INFO, WARN, ERROR) - default: `INFO`
 
 ## Usage
 
@@ -232,44 +242,7 @@ store/
     └── <filename>
 ```
 
-## Development
-
-### Building
-
-```bash
-# Standard build with FTS5 support
-make build
-
-# Build and run
-make run
-
-# Clean build artifacts
-make clean
-```
-
-### Environment Variables
-
-- `DB_DIR` (default: `store`): Directory for SQLite databases and media
-- `LOG_LEVEL` (default: `INFO`): Logging level (DEBUG, INFO, WARN, ERROR)
-- `FFMPEG_PATH` (default: `ffmpeg`): Path to ffmpeg binary
-
-### CGO and FTS5 Requirements
-
-> **Important:** This project requires CGO and SQLite FTS5 support:
->
-> - Build with `CGO_ENABLED=1`
-> - Include `-tags "sqlite_fts5"` build tag
-> - Migration will fail with a clear error if FTS5 is not available
-
 ## Common Issues
-
-### "SQLite FTS5 is not available"
-
-Ensure you're building with CGO enabled and the FTS5 tag:
-
-```bash
-CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mcp
-```
 
 ### No messages appearing after pairing
 
@@ -280,23 +253,6 @@ history sync persisted messages count=...
 ```
 
 > **Note:** History sync can take several minutes depending on the size of your WhatsApp history.
-
-### Audio conversion fails
-
-Install ffmpeg or set the `FFMPEG_PATH` environment variable:
-
-```bash
-brew install ffmpeg  # macOS
-apt install ffmpeg   # Linux
-```
-
-### CGO errors on macOS
-
-Install Xcode Command Line Tools:
-
-```bash
-xcode-select --install
-```
 
 ## License
 
