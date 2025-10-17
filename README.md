@@ -6,12 +6,14 @@ A Model Context Protocol (MCP) server for WhatsApp integration. Send messages, s
 
 ## Overview
 
-This MCP server provides 6 tools to interact with your WhatsApp account via the whatsmeow library:
+This MCP server provides 14 tools to interact with your WhatsApp account via the whatsmeow library:
 
-- Messaging (2 tools) - Send text and media messages to contacts and groups
-- Chats (2 tools) - List conversations and retrieve message history
-- Search (1 tool) - Full-text search across all messages using SQLite FTS5
-- Media (1 tool) - Download and access media files from conversations
+- **Messaging (1 tool)** - Send text and media messages (with fuzzy name matching)
+- **Chats (5 tools)** - List, search, and manage conversations and contacts
+- **Messages (4 tools)** - Retrieve message history with context and filtering
+- **Search (1 tool)** - Full-text search across all messages using SQLite FTS5
+- **Media (1 tool)** - Download and access media files from conversations
+- **Status (1 tool)** - Check connection status and server health
 
 All messages and chats are persisted to a local SQLite database with full-text search capabilities, enabling rich queries and analysis of your WhatsApp history.
 
@@ -105,7 +107,9 @@ Add to your configuration file:
 
 ### Available Environment Variables
 
+- `DB_DIR` - Directory for SQLite databases and downloaded media - default: `store`
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARN, ERROR) - default: `INFO`
+- `FFMPEG_PATH` - Path to ffmpeg binary for audio conversion - default: `ffmpeg`
 
 ## Usage
 
@@ -115,20 +119,23 @@ Ask Claude to interact with your WhatsApp data using natural language.
 
 ```
 "Send a message to John saying I'll be there in 10 minutes"
-"Send a photo from ~/Desktop/photo.jpg to Mom"
+"Send a photo from ~/Desktop/photo.jpg to Bob"
 "Send this audio recording to the Project Team group"
 ```
 
-> **Recipient Formats:**
+> **Recipient Formats (with fuzzy name matching):**
 >
-> - Direct messages: Phone number without `+` (e.g., `441234567890`)
-> - Groups: Full JID (e.g., `123456789@g.us`) or group name if already in database
+> - Contact/group names: `"John"`, `"Bob"`, `"Project Team"` (searches your chat history)
+> - Phone numbers: Without `+` (e.g., `447123456789`)
+> - Full JID: `447123456789@s.whatsapp.net` for contacts, `123456@g.us` for groups
+>
+> If multiple matches are found for a name, you'll be prompted to disambiguate using the full JID.
 
 ### Viewing Conversations
 
 ```
 "Show me my recent chats"
-"List my last 20 messages with Sarah"
+"List my last 20 messages with John"
 "Show the conversation with Dad from yesterday with context"
 ```
 
@@ -144,115 +151,47 @@ Ask Claude to interact with your WhatsApp data using natural language.
 
 ```
 "Download the latest photo from the Family group"
-"Save that video Mike sent me yesterday"
+"Save that video Mick sent me yesterday"
 ```
 
 ## Available Tools
 
-| Tool              | Description                                                        |
-| ----------------- | ------------------------------------------------------------------ |
-| `list_chats`      | List all WhatsApp conversations with last message time             |
-| `list_messages`   | Retrieve message history for a specific chat with optional context |
-| `search_messages` | Full-text search across all messages using FTS5                    |
-| `send_text`       | Send a text message to a contact or group                          |
-| `send_media`      | Send media (image, video, audio, document) with optional caption   |
-| `download_media`  | Download media files from messages to local storage                |
+### Chat Management
 
-## Architecture
+| Tool                         | Description                                                         |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `list_chats`                 | List WhatsApp conversations with filtering, sorting, and pagination |
+| `get_chat`                   | Get detailed information about a specific chat by JID               |
+| `search_contacts`            | Search for contacts by name or phone number                         |
+| `get_direct_chat_by_contact` | Get direct message chat by phone number                             |
+| `get_contact_chats`          | List all chats (DMs and groups) involving a specific contact        |
 
-### Core Components
+### Message Operations
 
-- WhatsApp Client (`internal/wa/client.go`) - Wraps whatsmeow for connection management, event handling, and message operations
-- SQLite Store (`internal/store/store.go`) - Persists messages and chats with FTS5 full-text search
-- Media Processing (`internal/media/`) - Handles audio conversion (ffmpeg) and Opus metadata extraction
-- MCP Server (`cmd/whatsapp-mcp/main.go`) - Exposes tools over stdio using mark3labs/mcp-go
+| Tool                   | Description                                                                 |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `list_messages`        | List messages with powerful filtering (date range, sender, chat, content)   |
+| `get_message_context`  | Get surrounding messages around a specific message for conversation context |
+| `get_last_interaction` | Get the most recent message with a specific contact                         |
+| `search_messages`      | Full-text search across all messages using FTS5 with advanced query syntax  |
 
-### Data Flow
+### Messaging
 
-1. Message Reception: whatsmeow events → event handlers → SQLite (chats + messages + FTS5)
-2. Name Resolution: Database cache → conversation metadata → group info → contacts → fallback to JID
-3. Sending: Parse recipient → classify media → upload → construct proto message → send
-4. Audio: Non-.ogg files are converted to Opus via ffmpeg before sending as PTT (push-to-talk)
+| Tool           | Description                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
+| `send_message` | Send text, media, or both to contacts/groups (supports fuzzy name matching) |
 
-### Database Schema
+### Media
 
-`chats` table:
+| Tool             | Description                                                                      |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `download_media` | Download media files (image/video/audio/document) from messages to local storage |
 
-- `jid` (PK): WhatsApp JID identifier
-- `name`: Human-friendly name (resolved from contacts/groups)
-- `last_message_time`: Timestamp of latest message
+### Status
 
-`messages` table:
-
-- `(id, chat_jid)` (PK): Unique message ID per chat
-- `sender`: Phone number or JID of sender
-- `content`: Text content or emoji summary for media
-- `timestamp`: Message timestamp
-- `is_from_me`: Boolean indicating sent by you
-- Media fields: `media_type`, `filename`, `url`, `media_key`, `file_sha256`, etc.
-
-`messages_fts` (FTS5):
-
-- Virtual table for full-text search on `content`, `chat_jid`, `sender`, `timestamp`
-
-## Key Features
-
-### Full-Text Search with FTS5
-
-Messages are indexed using SQLite's FTS5 extension, enabling fast and powerful search queries:
-
-```
-"Search for messages containing 'vacation OR holiday' from last month"
-"Find all messages from Sarah about the project"
-```
-
-### Automatic Audio Conversion
-
-Non-.ogg audio files are automatically converted to Opus format using ffmpeg before sending:
-
-- Converts to 32kbps, 24kHz Opus in Ogg container
-- Extracts duration and waveform metadata for WhatsApp PTT
-- Supports all ffmpeg-compatible audio formats
-
-### Context-Aware Message Retrieval
-
-The `list_messages` tool can include surrounding messages for context:
-
-```
-"Show me the conversation with context around the message about dinner"
-```
-
-### Intelligent Name Resolution
-
-Contact and group names are resolved with multiple fallback strategies:
-
-1. Cached database name
-2. Conversation display name
-3. WhatsApp group info
-4. Contact info (`FullName` → `BusinessName` → `PushName`)
-5. Phone number/JID as fallback
-
-## Storage Layout
-
-```
-store/
-├── whatsapp.db           # whatsmeow session store
-├── messages.db           # chats and messages SQLite database
-└── <chatJID>/            # per-chat media downloads
-    └── <filename>
-```
-
-## Common Issues
-
-### No messages appearing after pairing
-
-Wait for the initial history sync to complete. Check logs for:
-
-```
-history sync persisted messages count=...
-```
-
-> **Note:** History sync can take several minutes depending on the size of your WhatsApp history.
+| Tool                    | Description                                                            |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `get_connection_status` | Check WhatsApp connection status, login state, and database statistics |
 
 ## License
 
