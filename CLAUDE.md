@@ -60,8 +60,8 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 
 **Tools registered:**
 - Chat management: `list_chats`, `get_chat`, `search_contacts`, `get_direct_chat_by_contact`, `get_contact_chats`
-- Message operations: `list_messages`, `get_message_context`, `get_last_interaction`, `search_messages`
-- Messaging: `send_message` (unified tool for text, media, or both with fuzzy name matching)
+- Message operations: `list_messages`, `get_message_context`, `get_last_interaction`, `search_messages` (with date filters)
+- Messaging: `send_message` (unified tool for text, media, or both with fuzzy name matching and reply/threading)
 - Media: `download_media`
 - Status: `get_connection_status`
 
@@ -84,7 +84,9 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 **internal/wa/messaging.go**
 
 - Message operations: `SendText`, `SendMedia` (with automatic ffmpeg conversion for non-.ogg audio), `DownloadMedia`
+- Reply/threading support: `buildQuotedMessage` constructs quoted replies with WhatsApp ContextInfo
 - Media classification by file extension (jpg → image, mp4 → video, ogg → audio PTT)
+- Handles both direct and group message quoting with proper participant resolution
 
 **internal/service/chat_service.go & message_service.go**
 
@@ -135,6 +137,7 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 3. **Sending Messages**:
    - MCP tool call → service layer validation → fuzzy recipient resolution (resolver.go) → classify media type → upload via whatsmeow → construct proto message → send (messaging.go)
    - Fuzzy resolution: Check if phone/JID → search chat names in DB → return match or disambiguation prompt
+   - Reply/threading: If `reply_to_message_id` provided → fetch original message from DB → build ContextInfo with quoted message → attach to outgoing message
 4. **Audio Handling**: If not .ogg → ffmpeg convert (ffmpeg.go) → upload converted → analyze for duration/waveform (opus.go) → send as PTT
 5. **Query Operations**: MCP tool → service layer → store queries (queries.go) → domain models → JSON response
 
@@ -198,6 +201,21 @@ The `send_message` tool supports three recipient formats:
 - `.ogg` files are sent directly as PTT (push-to-talk) with duration/waveform metadata
 - Non-.ogg audio is converted via ffmpeg before sending
 - Images/videos/documents are classified by extension and uploaded as appropriate message types
+
+### Message Threading and Replies
+
+- `send_message` tool supports `reply_to_message_id` parameter for threaded conversations
+- `buildQuotedMessage` (messaging.go) fetches original message from database and constructs WhatsApp ContextInfo
+- Quoted messages include original content (or media type emoji for media: 📷 Photo, 🎥 Video, 🎤 Audio, 📄 Document)
+- Handles both direct and group message quoting with proper participant JID resolution
+- Works with both text and media messages (images, videos, audio, documents)
+
+### Search with Date Filters
+
+- `search_messages` tool supports `after` and `before` parameters for date-range filtering
+- Filters accept ISO-8601 timestamps (e.g., `2025-01-15T00:00:00Z`)
+- Combines with FTS5 full-text search for powerful time-bounded queries
+- Implementation in `SearchMessages` (queries.go) with SQL date WHERE clauses
 
 ### FTS5 Requirement
 

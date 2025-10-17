@@ -329,14 +329,16 @@ func main() {
 	// send_message - Unified tool for sending text, media, or both
 	srv.AddTool(mcp.NewTool(
 		"send_message",
-		mcp.WithDescription("Send a message to a WhatsApp contact or group. Can send text only, media only (image/video/audio/document), or media with caption. Supports fuzzy name matching - you can use contact/group names instead of JIDs. Audio files are sent as voice messages (PTT) and automatically converted to Opus if needed."),
-		mcp.WithString("recipient", mcp.Required(), mcp.Description("Contact name (e.g., 'John'), phone number without '+' (e.g., '441234567890'), or full JID (e.g., '123456@g.us'). Names are matched against your chat history.")),
+		mcp.WithDescription("Send a message to a WhatsApp contact or group. Can send text only, media only (image/video/audio/document), or media with caption. Supports fuzzy name matching - you can use contact/group names instead of JIDs. Audio files are sent as voice messages (PTT) and automatically converted to Opus if needed. Supports replying to messages for threaded conversations."),
+		mcp.WithString("recipient", mcp.Required(), mcp.Description("Contact name (e.g., 'John'), phone number without '+' (e.g., '447123456789'), or full JID (e.g., '123456@g.us'). Names are matched against your chat history.")),
 		mcp.WithString("text", mcp.Description("Message text. If media_path provided, becomes caption for the media. If no media_path, sent as text message. Optional for media-only messages.")),
 		mcp.WithString("media_path", mcp.Description("Absolute path to media file. Supports images (jpg/png), videos (mp4), audio (ogg/mp3/wav/m4a), documents (pdf/docx). Audio sent as voice messages (PTT).")),
+		mcp.WithString("reply_to_message_id", mcp.Description("Optional message ID to reply to. Creates a quoted/threaded reply. Get message IDs from list_messages or search_messages.")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		recipient := mcp.ParseString(req, "recipient", "")
 		text := mcp.ParseString(req, "text", "")
 		mediaPath := mcp.ParseString(req, "media_path", "")
+		replyToMessageID := mcp.ParseString(req, "reply_to_message_id", "")
 
 		// Validation
 		if recipient == "" {
@@ -371,7 +373,7 @@ func main() {
 
 		if mediaPath != "" {
 			// Sending media (text becomes caption if provided)
-			result, err = messageService.SendMedia(resolvedRecipient, mediaPath, text)
+			result, err = messageService.SendMedia(resolvedRecipient, mediaPath, text, replyToMessageID)
 			if err != nil {
 				return mcp.NewToolResultStructuredOnly(map[string]any{
 					"success": false,
@@ -382,7 +384,7 @@ func main() {
 			}
 		} else {
 			// Sending text only
-			result, err = messageService.SendText(resolvedRecipient, text)
+			result, err = messageService.SendText(resolvedRecipient, text, replyToMessageID)
 			if err != nil {
 				return mcp.NewToolResultStructuredOnly(map[string]any{
 					"success": false,

@@ -16,7 +16,8 @@ import (
 )
 
 // SendText sends a text message to a JID or phone number string (without +) or group JID.
-func (c *Client) SendText(recipient, text string) (bool, string, error) {
+// If replyToMessageID is provided, sends as a quoted reply.
+func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, string, error) {
 	if !c.WA.IsConnected() {
 		return false, "not connected", fmt.Errorf("not connected")
 	}
@@ -26,7 +27,23 @@ func (c *Client) SendText(recipient, text string) (bool, string, error) {
 		return false, "invalid recipient", err
 	}
 
-	msg := &waE2E.Message{Conversation: protoString(text)}
+	msg := &waE2E.Message{}
+
+	// If replying to a message, construct quoted reply
+	if replyToMessageID != "" {
+		quotedMsg, err := c.buildQuotedMessage(replyToMessageID, jid.String())
+		if err != nil {
+			return false, "failed to build quote", err
+		}
+
+		msg.ExtendedTextMessage = &waE2E.ExtendedTextMessage{
+			Text:        protoString(text),
+			ContextInfo: quotedMsg,
+		}
+	} else {
+		msg.Conversation = protoString(text)
+	}
+
 	_, err = c.WA.SendMessage(context.Background(), jid, msg)
 	if err != nil {
 		return false, err.Error(), err
@@ -36,7 +53,8 @@ func (c *Client) SendText(recipient, text string) (bool, string, error) {
 }
 
 // SendMedia sends an image/video/document/audio with optional caption; audio is PTT if .ogg.
-func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error) {
+// If replyToMessageID is provided, sends as a quoted reply.
+func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (bool, string, error) {
 	if !c.WA.IsConnected() {
 		return false, "not connected", fmt.Errorf("not connected")
 	}
@@ -60,6 +78,15 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 	m := &waE2E.Message{}
 	base := filepath.Base(path)
 
+	// Build quoted message context if replying
+	var quotedCtx *waE2E.ContextInfo
+	if replyToMessageID != "" {
+		quotedCtx, err = c.buildQuotedMessage(replyToMessageID, jid.String())
+		if err != nil {
+			return false, "failed to build quote", err
+		}
+	}
+
 	switch mediaType {
 	case whatsmeow.MediaImage:
 		m.ImageMessage = &waE2E.ImageMessage{
@@ -71,6 +98,7 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 			FileEncSHA256: up.FileEncSHA256,
 			FileSHA256:    up.FileSHA256,
 			FileLength:    &up.FileLength,
+			ContextInfo:   quotedCtx,
 		}
 	case whatsmeow.MediaVideo:
 		m.VideoMessage = &waE2E.VideoMessage{
@@ -82,6 +110,7 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 			FileEncSHA256: up.FileEncSHA256,
 			FileSHA256:    up.FileSHA256,
 			FileLength:    &up.FileLength,
+			ContextInfo:   quotedCtx,
 		}
 	case whatsmeow.MediaDocument:
 		m.DocumentMessage = &waE2E.DocumentMessage{
@@ -94,6 +123,7 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 			FileEncSHA256: up.FileEncSHA256,
 			FileSHA256:    up.FileSHA256,
 			FileLength:    &up.FileLength,
+			ContextInfo:   quotedCtx,
 		}
 	case whatsmeow.MediaAudio:
 		// If not .ogg, convert via ffmpeg
@@ -126,6 +156,7 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 				Seconds:       protoUint32(uint32(dur)),
 				PTT:           protoBool(true),
 				Waveform:      waveform,
+				ContextInfo:   quotedCtx,
 			}
 		} else {
 			dur, waveform, _ := media.AnalyzeOggOpus(b)
@@ -140,6 +171,7 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 				Seconds:       protoUint32(uint32(dur)),
 				PTT:           protoBool(true),
 				Waveform:      waveform,
+				ContextInfo:   quotedCtx,
 			}
 		}
 	}
@@ -212,6 +244,72 @@ func parseRecipient(recipient string) (types.JID, error) {
 		return types.ParseJID(recipient)
 	}
 	return types.JID{User: recipient, Server: "s.whatsapp.net"}, nil
+}
+
+// buildQuotedMessage fetches the message being replied to and constructs a ContextInfo.
+func (c *Client) buildQuotedMessage(messageID, chatJID string) (*waE2E.ContextInfo, error) {
+	var sender, content string
+	var isFromMe bool
+	var mediaType *string
+
+	// Query the message from the database
+	row := c.Store.Messages.QueryRow(`
+		SELECT sender, content, is_from_me, media_type
+		FROM messages
+		WHERE id = ? AND chat_jid = ?
+	`, messageID, chatJID)
+
+	err := row.Scan(&sender, &content, &isFromMe, &mediaType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find quoted message: %w", err)
+	}
+
+	// Build the participant JID
+	participantJID := ""
+	if strings.HasSuffix(chatJID, "@g.us") {
+		// For group messages, participant is the sender's JID
+		if !strings.Contains(sender, "@") {
+			participantJID = sender + "@s.whatsapp.net"
+		} else {
+			participantJID = sender
+		}
+	}
+
+	// Construct the quoted message based on type
+	quotedMsg := &waE2E.Message{}
+	if mediaType != nil && *mediaType != "" {
+		// For media messages, use the media type emoji as placeholder
+		quotedMsg.Conversation = protoString(getMediaEmoji(*mediaType))
+	} else {
+		quotedMsg.Conversation = protoString(content)
+	}
+
+	ctx := &waE2E.ContextInfo{
+		StanzaID:      protoString(messageID),
+		QuotedMessage: quotedMsg,
+	}
+
+	if participantJID != "" {
+		ctx.Participant = protoString(participantJID)
+	}
+
+	return ctx, nil
+}
+
+// getMediaEmoji returns an emoji representation for media types.
+func getMediaEmoji(mediaType string) string {
+	switch mediaType {
+	case "image":
+		return "📷 Photo"
+	case "video":
+		return "🎥 Video"
+	case "audio":
+		return "🎤 Audio"
+	case "document":
+		return "📄 Document"
+	default:
+		return "📎 Media"
+	}
 }
 
 // classify determines WhatsApp media type and MIME type from file extension.
