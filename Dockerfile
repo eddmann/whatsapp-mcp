@@ -1,11 +1,18 @@
 # Multi-stage build for minimal final image with CGO support
-FROM --platform=$TARGETPLATFORM golang:1.24-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
 
-# Install build dependencies for CGO and SQLite
+ARG TARGETOS
+ARG TARGETARCH
+
+# Install build dependencies for CGO and SQLite (including cross-compilation tools)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     make \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    gcc-x86-64-linux-gnu \
+    g++-x86-64-linux-gnu \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -22,7 +29,14 @@ COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 
 # Build the binary with CGO enabled and SQLite FTS5 support
-RUN CGO_ENABLED=1 go build -tags "sqlite_fts5" -o whatsapp-mcp ./cmd/whatsapp-mcp
+# Configure cross-compilation toolchain based on target architecture
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++; \
+    elif [ "$TARGETARCH" = "amd64" ]; then \
+        export CC=x86_64-linux-gnu-gcc CXX=x86_64-linux-gnu-g++; \
+    fi && \
+    CGO_ENABLED=1 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -tags "sqlite_fts5" -o whatsapp-mcp ./cmd/whatsapp-mcp
 
 # Final stage - minimal runtime image
 FROM --platform=$TARGETPLATFORM debian:bookworm-slim
