@@ -121,6 +121,7 @@ Ask Claude to interact with your WhatsApp data using natural language.
 "Send a message to John saying I'll be there in 10 minutes"
 "Send a photo from ~/Desktop/photo.jpg to Bob"
 "Send this audio recording to the Project Team group"
+"Reply to that message from Sarah saying 'Sounds good!'"
 ```
 
 > **Recipient Formats (with fuzzy name matching):**
@@ -130,6 +131,10 @@ Ask Claude to interact with your WhatsApp data using natural language.
 > - Full JID: `447123456789@s.whatsapp.net` for contacts, `123456@g.us` for groups
 >
 > If multiple matches are found for a name, you'll be prompted to disambiguate using the full JID.
+
+> **Message Threading:**
+>
+> Reply to specific messages to create threaded conversations. The original message will be quoted in your reply.
 
 ### Viewing Conversations
 
@@ -173,13 +178,13 @@ Ask Claude to interact with your WhatsApp data using natural language.
 | `list_messages`        | List messages with powerful filtering (date range, sender, chat, content)   |
 | `get_message_context`  | Get surrounding messages around a specific message for conversation context |
 | `get_last_interaction` | Get the most recent message with a specific contact                         |
-| `search_messages`      | Full-text search across all messages using FTS5 with advanced query syntax  |
+| `search_messages`      | Full-text search with FTS5, date filters, and advanced query operators      |
 
 ### Messaging
 
-| Tool           | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
-| `send_message` | Send text, media, or both to contacts/groups (supports fuzzy name matching) |
+| Tool           | Description                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `send_message` | Send text, media, or both to contacts/groups with fuzzy name matching and reply/threading |
 
 ### Media
 

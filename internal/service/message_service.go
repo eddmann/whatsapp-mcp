@@ -95,7 +95,7 @@ func (s *MessageService) SearchMessages(opts domain.SearchMessagesOptions) ([]do
 }
 
 // SendText sends a text message to a recipient.
-func (s *MessageService) SendText(recipient, message string) (*domain.SendResult, error) {
+func (s *MessageService) SendText(recipient, message, replyToMessageID string) (*domain.SendResult, error) {
 	if recipient == "" {
 		return nil, fmt.Errorf("recipient cannot be empty")
 	}
@@ -103,7 +103,7 @@ func (s *MessageService) SendText(recipient, message string) (*domain.SendResult
 		return nil, fmt.Errorf("message cannot be empty")
 	}
 
-	success, msg, err := s.client.SendText(recipient, message)
+	success, msg, err := s.client.SendText(recipient, message, replyToMessageID)
 	if err != nil {
 		return &domain.SendResult{Success: false, Message: err.Error()}, nil
 	}
@@ -112,7 +112,7 @@ func (s *MessageService) SendText(recipient, message string) (*domain.SendResult
 }
 
 // SendMedia sends a media file to a recipient with optional caption.
-func (s *MessageService) SendMedia(recipient, mediaPath, caption string) (*domain.SendResult, error) {
+func (s *MessageService) SendMedia(recipient, mediaPath, caption, replyToMessageID string) (*domain.SendResult, error) {
 	if recipient == "" {
 		return nil, fmt.Errorf("recipient cannot be empty")
 	}
@@ -120,7 +120,7 @@ func (s *MessageService) SendMedia(recipient, mediaPath, caption string) (*domai
 		return nil, fmt.Errorf("media_path cannot be empty")
 	}
 
-	success, msg, err := s.client.SendMedia(recipient, mediaPath, caption)
+	success, msg, err := s.client.SendMedia(recipient, mediaPath, caption, replyToMessageID)
 	if err != nil {
 		return &domain.SendResult{Success: false, Message: err.Error()}, nil
 	}
