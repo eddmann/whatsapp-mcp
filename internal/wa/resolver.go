@@ -95,6 +95,83 @@ func (c *Client) resolvePreferredName(jid types.JID) string {
 	return jid.User
 }
 
+// ResolveRecipient attempts to resolve a recipient string (phone, JID, or name) to a WhatsApp JID.
+// Returns the resolved JID string, or an error if not found or ambiguous.
+func (c *Client) ResolveRecipient(recipient string) (string, error) {
+	if recipient == "" {
+		return "", fmt.Errorf("recipient cannot be empty")
+	}
+
+	// 1. If it looks like a JID or phone number, try direct parsing
+	if strings.Contains(recipient, "@") {
+		// Contains @, likely a full JID
+		jid, err := types.ParseJID(recipient)
+		if err == nil {
+			return jid.String(), nil
+		}
+		// Invalid JID, fall through to name search
+	}
+
+	// Check if it's all digits (phone number)
+	isPhone := true
+	for _, ch := range recipient {
+		if ch < '0' || ch > '9' {
+			isPhone = false
+			break
+		}
+	}
+	if isPhone && len(recipient) > 5 {
+		// Looks like a phone number, construct JID
+		return fmt.Sprintf("%s@s.whatsapp.net", recipient), nil
+	}
+
+	// 2. Assume it's a name, search chats (includes both contacts and groups)
+	pattern := "%" + strings.ToLower(recipient) + "%"
+	rows, err := c.Store.Messages.Query(`
+		SELECT jid, name FROM chats
+		WHERE LOWER(name) LIKE ?
+		ORDER BY name LIMIT 10`, pattern)
+	if err != nil {
+		return "", fmt.Errorf("search failed: %w", err)
+	}
+	defer rows.Close()
+
+	type match struct {
+		jid  string
+		name string
+	}
+	var matches []match
+
+	for rows.Next() {
+		var jid string
+		var name sql.NullString
+		if err := rows.Scan(&jid, &name); err != nil {
+			continue
+		}
+		matches = append(matches, match{jid: jid, name: name.String})
+	}
+
+	// 3. Handle results
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no contact or group found matching '%s'. Use phone number (e.g., 441234567890) or full JID (e.g., 123456@g.us)", recipient)
+	}
+
+	if len(matches) == 1 {
+		return matches[0].jid, nil
+	}
+
+	// Multiple matches - provide disambiguation
+	var suggestions []string
+	for _, m := range matches {
+		if m.name != "" {
+			suggestions = append(suggestions, fmt.Sprintf("%s (%s)", m.name, m.jid))
+		} else {
+			suggestions = append(suggestions, m.jid)
+		}
+	}
+	return "", fmt.Errorf("multiple matches found for '%s': %s. Please use the full JID to disambiguate", recipient, strings.Join(suggestions, ", "))
+}
+
 // backfillChatNames finds chats without a proper name and updates them using
 // contact/group information once available post-connect.
 func (c *Client) backfillChatNames() {
