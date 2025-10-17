@@ -8,12 +8,12 @@ A Model Context Protocol (MCP) server for WhatsApp integration. Send messages, s
 
 This MCP server provides 14 tools to interact with your WhatsApp account via the whatsmeow library:
 
-- **Messaging (1 tool)** - Send text and media messages (with fuzzy name matching)
-- **Chats (5 tools)** - List, search, and manage conversations and contacts
-- **Messages (4 tools)** - Retrieve message history with context and filtering
-- **Search (1 tool)** - Full-text search across all messages using SQLite FTS5
-- **Media (1 tool)** - Download and access media files from conversations
-- **Status (1 tool)** - Check connection status and server health
+- Messaging (1 tool) - Send text and media messages (with fuzzy name matching)
+- Chats (5 tools) - List, search, and manage conversations and contacts
+- Messages (4 tools) - Retrieve message history with context and filtering
+- Search (1 tool) - Full-text search across all messages using SQLite FTS5
+- Media (1 tool) - Download and access media files from conversations
+- Status (1 tool) - Check connection status and server health
 
 All messages and chats are persisted to a local SQLite database with full-text search capabilities, enabling rich queries and analysis of your WhatsApp history.
 
