@@ -32,6 +32,14 @@ make clean
 
 Removes the compiled binary.
 
+### Format
+
+```bash
+make format
+```
+
+Formats Go source code using `go fmt`.
+
 ### Alternative Build (without Makefile)
 
 ```bash
@@ -44,28 +52,71 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 
 **cmd/whatsapp-mcp/main.go**
 
-- Entry point: initializes store, WhatsApp client, MCP server
-- Registers all MCP tools (list_chats, send_message, download_media, etc.)
+- Entry point: initializes store, WhatsApp client, services, and MCP server
+- Registers 14 MCP tools covering chats, messages, search, messaging, media, and status
 - Handles graceful shutdown (SIGINT/SIGTERM) to disconnect WhatsApp and close DBs
 - Runs WhatsApp connection in background goroutine with QR authentication
 - Serves MCP over stdio using mark3labs/mcp-go
 
+**Tools registered:**
+- Chat management: `list_chats`, `get_chat`, `search_contacts`, `get_direct_chat_by_contact`, `get_contact_chats`
+- Message operations: `list_messages`, `get_message_context`, `get_last_interaction`, `search_messages`
+- Messaging: `send_message` (unified tool for text, media, or both with fuzzy name matching)
+- Media: `download_media`
+- Status: `get_connection_status`
+
 **internal/wa/client.go**
 
 - Wraps whatsmeow.Client with store integration
+- Provides core WhatsApp client initialization and handler registration
+
+**internal/wa/sync.go**
+
 - Event handlers: `handleMessage` persists incoming messages, `handleHistorySync` backfills history
+- Processes WhatsApp events and syncs to local database
+
+**internal/wa/resolver.go**
+
 - Name resolution: `getChatName` and `resolvePreferredName` resolve JIDs to human-friendly names using contacts/groups
+- Fuzzy recipient resolution: `ResolveRecipient` matches contact/group names to JIDs with disambiguation
 - Backfill: `backfillChatNames` updates chats post-connect once contacts are available
+
+**internal/wa/messaging.go**
+
 - Message operations: `SendText`, `SendMedia` (with automatic ffmpeg conversion for non-.ogg audio), `DownloadMedia`
 - Media classification by file extension (jpg → image, mp4 → video, ogg → audio PTT)
+
+**internal/service/chat_service.go & message_service.go**
+
+- Service layer providing business logic for chat and message operations
+- Validates parameters and orchestrates store and client operations
+- Methods correspond directly to MCP tool implementations
 
 **internal/store/store.go**
 
 - SQLite schema: `chats` table (jid, name, last_message_time) and `messages` table (id, chat_jid, sender, content, timestamp, media fields)
 - FTS5 virtual table `messages_fts` for full-text search with triggers for auto-sync
-- MCP tool methods (e.g., `MListChats`, `MSearchMessages`) return JSON-compatible maps
-- Context expansion: `MListMessages` can include before/after messages when `include_context=true`
 - Migration enforces FTS5 availability and fails with clear error if not compiled in
+- Database initialization and connection management
+
+**internal/store/queries.go**
+
+- All database query operations for chats and messages
+- Methods: `ListChats`, `GetChat`, `SearchContacts`, `ListMessages`, `SearchMessages`, `GetMessageContext`, etc.
+- Returns domain models (JSON-compatible structs) for MCP tool responses
+- Context expansion: `ListMessages` can include before/after messages when `include_context=true`
+
+**internal/config/config.go**
+
+- Configuration management from environment variables
+- Settings: `DB_DIR`, `LOG_LEVEL`, `FFMPEG_PATH`, WhatsApp QR timeout, MCP page size limits
+
+**internal/domain/models.go**
+
+- Domain models and option structs for all operations
+- Types: `Chat`, `Message`, `Contact`, `SendResult`, `DownloadResult`, `MessageContext`
+- Option types: `ListChatsOptions`, `ListMessagesOptions`, `SearchMessagesOptions`
+- All structs are JSON-serializable for MCP responses
 
 **internal/media/opus.go**
 
@@ -79,16 +130,19 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 
 ### Data Flow
 
-1. **Message Reception**: whatsmeow events → `handleMessage`/`handleHistorySync` → upsert `chats` and insert `messages` → FTS5 triggers update `messages_fts`
-2. **Chat Name Resolution**: Check DB cache → extract from conversation metadata → query group info/contacts via whatsmeow → fallback to JID user part
-3. **Sending Messages**: Parse recipient (phone or JID) → classify media type → upload via whatsmeow → construct proto message → send
-4. **Audio Handling**: If not .ogg → ffmpeg convert → upload converted → analyze for duration/waveform → send as PTT
+1. **Message Reception**: whatsmeow events → `handleMessage`/`handleHistorySync` (sync.go) → upsert `chats` and insert `messages` (queries.go) → FTS5 triggers update `messages_fts`
+2. **Chat Name Resolution**: Check DB cache → extract from conversation metadata → query group info/contacts via whatsmeow → fallback to JID user part (resolver.go)
+3. **Sending Messages**:
+   - MCP tool call → service layer validation → fuzzy recipient resolution (resolver.go) → classify media type → upload via whatsmeow → construct proto message → send (messaging.go)
+   - Fuzzy resolution: Check if phone/JID → search chat names in DB → return match or disambiguation prompt
+4. **Audio Handling**: If not .ogg → ffmpeg convert (ffmpeg.go) → upload converted → analyze for duration/waveform (opus.go) → send as PTT
+5. **Query Operations**: MCP tool → service layer → store queries (queries.go) → domain models → JSON response
 
 ### Database Schema
 
 **chats**
 
-- `jid` (PK): WhatsApp JID (e.g., `123456789@s.whatsapp.net`, `abcdef@g.us`)
+- `jid` (PK): WhatsApp JID (e.g., `447123456789@s.whatsapp.net`, `abcdef@g.us`)
 - `name`: Human-friendly name (resolved from contacts/groups)
 - `last_message_time`: Timestamp of latest message
 
@@ -123,11 +177,21 @@ store/
 
 ## Key Implementation Details
 
-### Recipients
+### Recipients and Fuzzy Matching
 
-- **Direct messages**: Use phone number without `+` (e.g., `441234567890`)
-- **Groups**: Use full JID (e.g., `123456789@g.us`)
-- Phone numbers are auto-converted to JIDs with `@s.whatsapp.net`
+The `send_message` tool supports three recipient formats:
+
+- **Contact/Group Names**: `"John"`, `"Bob"`, `"Project Team"` - uses fuzzy search against chat history
+- **Phone Numbers**: Without `+` (e.g., `447123456789`) - auto-converted to `@s.whatsapp.net` JID
+- **Full JID**: `447123456789@s.whatsapp.net` for contacts, `123456@g.us` for groups - direct match
+
+**Fuzzy Resolution Process (`ResolveRecipient` in resolver.go)**:
+1. Check if input contains `@` → try parsing as JID
+2. Check if input is all digits (5+ chars) → treat as phone number
+3. Otherwise, search `chats` table with case-insensitive `LIKE` match on name field
+4. If 0 matches → error with helpful message
+5. If 1 match → return JID
+6. If multiple matches → return error with disambiguation list showing all matches with their JIDs
 
 ### Media Sending
 
