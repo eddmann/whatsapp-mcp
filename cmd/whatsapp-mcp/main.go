@@ -329,8 +329,8 @@ func main() {
 	// send_message - Unified tool for sending text, media, or both
 	srv.AddTool(mcp.NewTool(
 		"send_message",
-		mcp.WithDescription("Send a message to a WhatsApp contact or group. Can send text only, media only (image/video/audio/document), or media with caption. For contacts, use phone number without '+'. For groups, use chat JID from list_chats. Audio files are sent as voice messages (PTT) and automatically converted to Opus if needed."),
-		mcp.WithString("recipient", mcp.Required(), mcp.Description("Phone number without '+' (e.g., '441234567890') or group JID (e.g., '123456@g.us')")),
+		mcp.WithDescription("Send a message to a WhatsApp contact or group. Can send text only, media only (image/video/audio/document), or media with caption. Supports fuzzy name matching - you can use contact/group names instead of JIDs. Audio files are sent as voice messages (PTT) and automatically converted to Opus if needed."),
+		mcp.WithString("recipient", mcp.Required(), mcp.Description("Contact name (e.g., 'John'), phone number without '+' (e.g., '441234567890'), or full JID (e.g., '123456@g.us'). Names are matched against your chat history.")),
 		mcp.WithString("text", mcp.Description("Message text. If media_path provided, becomes caption for the media. If no media_path, sent as text message. Optional for media-only messages.")),
 		mcp.WithString("media_path", mcp.Description("Absolute path to media file. Supports images (jpg/png), videos (mp4), audio (ogg/mp3/wav/m4a), documents (pdf/docx). Audio sent as voice messages (PTT).")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -343,7 +343,7 @@ func main() {
 			return mcp.NewToolResultStructuredOnly(map[string]any{
 				"success": false,
 				"error":   "recipient parameter is required",
-				"hint":    "Provide a phone number (e.g., '441234567890') or group JID (e.g., '123456@g.us'). Use list_chats to find available recipients.",
+				"hint":    "Provide a contact name (e.g., 'John'), phone number (e.g., '441234567890'), or group JID (e.g., '123456@g.us'). Use list_chats to find available recipients.",
 			}), nil
 		}
 
@@ -355,13 +355,23 @@ func main() {
 			}), nil
 		}
 
+		// Fuzzy recipient resolution
+		resolvedRecipient, err := waclient.ResolveRecipient(recipient)
+		if err != nil {
+			return mcp.NewToolResultStructuredOnly(map[string]any{
+				"success": false,
+				"error":   "recipient resolution failed",
+				"details": err.Error(),
+				"hint":    "Check the recipient identifier. Use list_chats to see available contacts and groups.",
+			}), nil
+		}
+
 		// Determine what to send
 		var result *domain.SendResult
-		var err error
 
 		if mediaPath != "" {
 			// Sending media (text becomes caption if provided)
-			result, err = messageService.SendMedia(recipient, mediaPath, text)
+			result, err = messageService.SendMedia(resolvedRecipient, mediaPath, text)
 			if err != nil {
 				return mcp.NewToolResultStructuredOnly(map[string]any{
 					"success": false,
@@ -372,7 +382,7 @@ func main() {
 			}
 		} else {
 			// Sending text only
-			result, err = messageService.SendText(recipient, text)
+			result, err = messageService.SendText(resolvedRecipient, text)
 			if err != nil {
 				return mcp.NewToolResultStructuredOnly(map[string]any{
 					"success": false,
