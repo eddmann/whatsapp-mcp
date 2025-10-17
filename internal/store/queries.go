@@ -502,7 +502,7 @@ func (d *DB) SearchMessages(opts domain.SearchMessagesOptions) ([]domain.Message
 			FROM messages m JOIN chats c ON m.chat_jid = c.jid
 			WHERE LOWER(m.content) LIKE LOWER(?)`
 
-		likeArgs := []any{"%"+opts.Query+"%"}
+		likeArgs := []any{"%" + opts.Query + "%"}
 		if len(dateWhere) > 0 {
 			likeQuery += " AND " + strings.Join(dateWhere, " AND ")
 			likeArgs = append(likeArgs, dateArgs...)
