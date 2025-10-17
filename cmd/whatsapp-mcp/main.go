@@ -302,13 +302,17 @@ func main() {
 		"search_messages",
 		mcp.WithDescription("Search message content across all conversations using full-text search (FTS5). Use this to find specific information in message history. Search syntax: simple keywords ('vacation'), exact phrases ('\"project meeting\"'), boolean operators ('vacation OR holiday', 'vacation AND photos'), exclusion ('vacation -work'), prefix wildcard ('vacat*'). Returns matching messages with chat name, sender, timestamp, and content."),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query string. Use simple keywords for best results. Examples: 'vacation', '\"project meeting\"', 'vacation OR holiday'. Supports FTS5 operators for advanced queries.")),
+		mcp.WithString("after", mcp.Description("ISO-8601 timestamp (e.g., '2025-01-15T00:00:00Z') - only messages after this time")),
+		mcp.WithString("before", mcp.Description("ISO-8601 timestamp (e.g., '2025-01-20T23:59:59Z') - only messages before this time")),
 		mcp.WithNumber("limit", mcp.Description("Maximum results to return (1-200)"), mcp.DefaultNumber(20), mcp.Min(1), mcp.Max(200)),
 		mcp.WithNumber("page", mcp.Description("Page number for pagination, 0-based"), mcp.DefaultNumber(0), mcp.Min(0)),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		opts := domain.SearchMessagesOptions{
-			Query: mcp.ParseString(req, "query", ""),
-			Limit: mcp.ParseInt(req, "limit", 20),
-			Page:  mcp.ParseInt(req, "page", 0),
+			Query:  mcp.ParseString(req, "query", ""),
+			After:  mcp.ParseString(req, "after", ""),
+			Before: mcp.ParseString(req, "before", ""),
+			Limit:  mcp.ParseInt(req, "limit", 20),
+			Page:   mcp.ParseInt(req, "page", 0),
 		}
 		messages, err := messageService.SearchMessages(opts)
 		if err != nil {
