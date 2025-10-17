@@ -42,8 +42,11 @@ type Contact struct {
 
 // SendResult represents the result of sending a message.
 type SendResult struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success   bool    `json:"success"`
+	Message   string  `json:"message"`
+	MessageID *string `json:"message_id,omitempty"`
+	ChatJID   *string `json:"chat_jid,omitempty"`
+	Timestamp *string `json:"timestamp,omitempty"`
 }
 
 // DownloadResult represents the result of downloading media.

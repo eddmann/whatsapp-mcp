@@ -197,7 +197,7 @@ func main() {
 			Query:          mcp.ParseString(req, "query", ""),
 			Limit:          mcp.ParseInt(req, "limit", 20),
 			Page:           mcp.ParseInt(req, "page", 0),
-			IncludeContext: mcp.ParseBoolean(req, "include_context", true),
+			IncludeContext: mcp.ParseBoolean(req, "include_context", false),
 			ContextBefore:  mcp.ParseInt(req, "context_before", 1),
 			ContextAfter:   mcp.ParseInt(req, "context_after", 1),
 		}

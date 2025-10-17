@@ -103,12 +103,27 @@ func (s *MessageService) SendText(recipient, message, replyToMessageID string) (
 		return nil, fmt.Errorf("message cannot be empty")
 	}
 
-	success, msg, err := s.client.SendText(recipient, message, replyToMessageID)
+	success, msg, messageID, chatJID, timestamp, err := s.client.SendText(recipient, message, replyToMessageID)
 	if err != nil {
 		return &domain.SendResult{Success: false, Message: err.Error()}, nil
 	}
 
-	return &domain.SendResult{Success: success, Message: msg}, nil
+	result := &domain.SendResult{
+		Success: success,
+		Message: msg,
+	}
+
+	if messageID != "" {
+		result.MessageID = &messageID
+	}
+	if chatJID != "" {
+		result.ChatJID = &chatJID
+	}
+	if timestamp != "" {
+		result.Timestamp = &timestamp
+	}
+
+	return result, nil
 }
 
 // SendMedia sends a media file to a recipient with optional caption.
@@ -120,12 +135,27 @@ func (s *MessageService) SendMedia(recipient, mediaPath, caption, replyToMessage
 		return nil, fmt.Errorf("media_path cannot be empty")
 	}
 
-	success, msg, err := s.client.SendMedia(recipient, mediaPath, caption, replyToMessageID)
+	success, msg, messageID, chatJID, timestamp, err := s.client.SendMedia(recipient, mediaPath, caption, replyToMessageID)
 	if err != nil {
 		return &domain.SendResult{Success: false, Message: err.Error()}, nil
 	}
 
-	return &domain.SendResult{Success: success, Message: msg}, nil
+	result := &domain.SendResult{
+		Success: success,
+		Message: msg,
+	}
+
+	if messageID != "" {
+		result.MessageID = &messageID
+	}
+	if chatJID != "" {
+		result.ChatJID = &chatJID
+	}
+	if timestamp != "" {
+		result.Timestamp = &timestamp
+	}
+
+	return result, nil
 }
 
 // DownloadMedia downloads media from a message.
