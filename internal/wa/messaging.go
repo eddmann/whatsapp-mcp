@@ -35,8 +35,8 @@ func (c *Client) SendText(recipient, text string) (bool, string, error) {
 	return true, fmt.Sprintf("sent to %s", recipient), nil
 }
 
-// SendMedia sends an image/video/document/audio; audio is PTT if .ogg.
-func (c *Client) SendMedia(recipient, path string) (bool, string, error) {
+// SendMedia sends an image/video/document/audio with optional caption; audio is PTT if .ogg.
+func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error) {
 	if !c.WA.IsConnected() {
 		return false, "not connected", fmt.Errorf("not connected")
 	}
@@ -63,7 +63,7 @@ func (c *Client) SendMedia(recipient, path string) (bool, string, error) {
 	switch mediaType {
 	case whatsmeow.MediaImage:
 		m.ImageMessage = &waE2E.ImageMessage{
-			Caption:        protoString(""),
+			Caption:        protoString(caption),
 			Mimetype:       protoString(mime),
 			URL:            &up.URL,
 			DirectPath:     &up.DirectPath,
@@ -74,7 +74,7 @@ func (c *Client) SendMedia(recipient, path string) (bool, string, error) {
 		}
 	case whatsmeow.MediaVideo:
 		m.VideoMessage = &waE2E.VideoMessage{
-			Caption:        protoString(""),
+			Caption:        protoString(caption),
 			Mimetype:       protoString(mime),
 			URL:            &up.URL,
 			DirectPath:     &up.DirectPath,
@@ -86,7 +86,7 @@ func (c *Client) SendMedia(recipient, path string) (bool, string, error) {
 	case whatsmeow.MediaDocument:
 		m.DocumentMessage = &waE2E.DocumentMessage{
 			Title:          protoString(base),
-			Caption:        protoString(""),
+			Caption:        protoString(caption),
 			Mimetype:       protoString(mime),
 			URL:            &up.URL,
 			DirectPath:     &up.DirectPath,

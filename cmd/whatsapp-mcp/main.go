@@ -322,16 +322,19 @@ func main() {
         return mcp.NewToolResultJSON(map[string]any{"success": true, "messages": messages})
     })
 
-    // send_message
+    // send_message - Unified tool for sending text, media, or both
     srv.AddTool(mcp.NewTool(
         "send_message",
-        mcp.WithDescription("Send a text message to a WhatsApp contact or group. For contacts, use phone number without '+'. For groups, use chat JID from list_chats."),
+        mcp.WithDescription("Send a message to a WhatsApp contact or group. Can send text only, media only (image/video/audio/document), or media with caption. For contacts, use phone number without '+'. For groups, use chat JID from list_chats. Audio files are sent as voice messages (PTT) and automatically converted to Opus if needed."),
         mcp.WithString("recipient", mcp.Required(), mcp.Description("Phone number without '+' (e.g., '441234567890') or group JID (e.g., '123456@g.us')")),
-        mcp.WithString("message", mcp.Required(), mcp.Description("Text message content to send")),
+        mcp.WithString("text", mcp.Description("Message text. If media_path provided, becomes caption for the media. If no media_path, sent as text message. Optional for media-only messages.")),
+        mcp.WithString("media_path", mcp.Description("Absolute path to media file. Supports images (jpg/png), videos (mp4), audio (ogg/mp3/wav/m4a), documents (pdf/docx). Audio sent as voice messages (PTT).")),
     ), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
         recipient := mcp.ParseString(req, "recipient", "")
-        message := mcp.ParseString(req, "message", "")
+        text := mcp.ParseString(req, "text", "")
+        mediaPath := mcp.ParseString(req, "media_path", "")
 
+        // Validation
         if recipient == "" {
             return mcp.NewToolResultStructuredOnly(map[string]any{
                 "success": false,
@@ -340,89 +343,42 @@ func main() {
             }), nil
         }
 
-        result, err := messageService.SendText(recipient, message)
-        if err != nil {
+        if text == "" && mediaPath == "" {
             return mcp.NewToolResultStructuredOnly(map[string]any{
                 "success": false,
-                "error":   "failed to send message",
-                "details": err.Error(),
-                "hint":    "Check WhatsApp connection with get_connection_status. Ensure recipient format is correct and WhatsApp is connected.",
-            }), nil
-        }
-        return mcp.NewToolResultJSON(result)
-    })
-
-    // send_file
-    srv.AddTool(mcp.NewTool(
-        "send_file",
-        mcp.WithDescription("Send a media file (image, video, document) to a WhatsApp contact or group. Supports jpg/png (images), mp4 (video), pdf/docx (documents)."),
-        mcp.WithString("recipient", mcp.Required(), mcp.Description("Phone number without '+' (e.g., '441234567890') or group JID (e.g., '123456@g.us')")),
-        mcp.WithString("media_path", mcp.Required(), mcp.Description("Absolute path to media file on the server (e.g., '/path/to/image.jpg')")),
-    ), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-        recipient := mcp.ParseString(req, "recipient", "")
-        mediaPath := mcp.ParseString(req, "media_path", "")
-
-        if recipient == "" {
-            return mcp.NewToolResultStructuredOnly(map[string]any{
-                "success": false,
-                "error":   "recipient parameter is required",
-                "hint":    "Provide a phone number (e.g., '441234567890') or group JID (e.g., '123456@g.us').",
-            }), nil
-        }
-        if mediaPath == "" {
-            return mcp.NewToolResultStructuredOnly(map[string]any{
-                "success": false,
-                "error":   "media_path parameter is required",
-                "hint":    "Provide the absolute path to the media file on the server (e.g., '/path/to/image.jpg').",
+                "error":   "either 'text' or 'media_path' must be provided",
+                "hint":    "Provide message text, a media file path, or both (media with caption).",
             }), nil
         }
 
-        result, err := messageService.SendMedia(recipient, mediaPath)
-        if err != nil {
-            return mcp.NewToolResultStructuredOnly(map[string]any{
-                "success": false,
-                "error":   "failed to send media",
-                "details": err.Error(),
-                "hint":    "Check that the file exists and is readable. Verify WhatsApp connection with get_connection_status.",
-            }), nil
-        }
-        return mcp.NewToolResultJSON(result)
-    })
+        // Determine what to send
+        var result *domain.SendResult
+        var err error
 
-    // send_audio_message
-    srv.AddTool(mcp.NewTool(
-        "send_audio_message",
-        mcp.WithDescription("Send an audio file as WhatsApp voice message (PTT). Accepts .ogg Opus format (sent directly) or other audio formats like .mp3, .wav, .m4a (auto-converted via ffmpeg to Opus). The audio is sent as a push-to-talk voice message."),
-        mcp.WithString("recipient", mcp.Required(), mcp.Description("Phone number without '+' (e.g., '441234567890') or group JID (e.g., '123456@g.us')")),
-        mcp.WithString("media_path", mcp.Required(), mcp.Description("Absolute path to audio file (e.g., '/path/to/audio.mp3'). Will be converted to Opus if not .ogg")),
-    ), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-        recipient := mcp.ParseString(req, "recipient", "")
-        mediaPath := mcp.ParseString(req, "media_path", "")
-
-        if recipient == "" {
-            return mcp.NewToolResultStructuredOnly(map[string]any{
-                "success": false,
-                "error":   "recipient parameter is required",
-                "hint":    "Provide a phone number (e.g., '441234567890') or group JID (e.g., '123456@g.us').",
-            }), nil
-        }
-        if mediaPath == "" {
-            return mcp.NewToolResultStructuredOnly(map[string]any{
-                "success": false,
-                "error":   "media_path parameter is required",
-                "hint":    "Provide the absolute path to the audio file (e.g., '/path/to/audio.mp3'). Non-.ogg files will be auto-converted via ffmpeg.",
-            }), nil
+        if mediaPath != "" {
+            // Sending media (text becomes caption if provided)
+            result, err = messageService.SendMedia(recipient, mediaPath, text)
+            if err != nil {
+                return mcp.NewToolResultStructuredOnly(map[string]any{
+                    "success": false,
+                    "error":   "failed to send media",
+                    "details": err.Error(),
+                    "hint":    "Check that the file exists and is readable. For audio files, ensure ffmpeg is installed. Verify WhatsApp connection with get_connection_status.",
+                }), nil
+            }
+        } else {
+            // Sending text only
+            result, err = messageService.SendText(recipient, text)
+            if err != nil {
+                return mcp.NewToolResultStructuredOnly(map[string]any{
+                    "success": false,
+                    "error":   "failed to send message",
+                    "details": err.Error(),
+                    "hint":    "Check WhatsApp connection with get_connection_status. Ensure recipient format is correct and WhatsApp is connected.",
+                }), nil
+            }
         }
 
-        result, err := messageService.SendMedia(recipient, mediaPath)
-        if err != nil {
-            return mcp.NewToolResultStructuredOnly(map[string]any{
-                "success": false,
-                "error":   "failed to send audio",
-                "details": err.Error(),
-                "hint":    "Ensure ffmpeg is installed for audio conversion. Check file exists and WhatsApp is connected.",
-            }), nil
-        }
         return mcp.NewToolResultJSON(result)
     })
 
