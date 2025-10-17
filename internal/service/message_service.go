@@ -103,27 +103,18 @@ func (s *MessageService) SendText(recipient, message, replyToMessageID string) (
 		return nil, fmt.Errorf("message cannot be empty")
 	}
 
-	success, msg, messageID, chatJID, timestamp, err := s.client.SendText(recipient, message, replyToMessageID)
+	result, err := s.client.SendText(recipient, message, replyToMessageID)
 	if err != nil {
 		return &domain.SendResult{Success: false, Message: err.Error()}, nil
 	}
 
-	result := &domain.SendResult{
-		Success: success,
-		Message: msg,
-	}
-
-	if messageID != "" {
-		result.MessageID = &messageID
-	}
-	if chatJID != "" {
-		result.ChatJID = &chatJID
-	}
-	if timestamp != "" {
-		result.Timestamp = &timestamp
-	}
-
-	return result, nil
+	return &domain.SendResult{
+		Success:   result.Success,
+		Message:   result.Message,
+		MessageID: ptrIfNotEmpty(result.MessageID),
+		ChatJID:   ptrIfNotEmpty(result.ChatJID),
+		Timestamp: ptrIfNotEmpty(result.Timestamp),
+	}, nil
 }
 
 // SendMedia sends a media file to a recipient with optional caption.
@@ -135,27 +126,18 @@ func (s *MessageService) SendMedia(recipient, mediaPath, caption, replyToMessage
 		return nil, fmt.Errorf("media_path cannot be empty")
 	}
 
-	success, msg, messageID, chatJID, timestamp, err := s.client.SendMedia(recipient, mediaPath, caption, replyToMessageID)
+	result, err := s.client.SendMedia(recipient, mediaPath, caption, replyToMessageID)
 	if err != nil {
 		return &domain.SendResult{Success: false, Message: err.Error()}, nil
 	}
 
-	result := &domain.SendResult{
-		Success: success,
-		Message: msg,
-	}
-
-	if messageID != "" {
-		result.MessageID = &messageID
-	}
-	if chatJID != "" {
-		result.ChatJID = &chatJID
-	}
-	if timestamp != "" {
-		result.Timestamp = &timestamp
-	}
-
-	return result, nil
+	return &domain.SendResult{
+		Success:   result.Success,
+		Message:   result.Message,
+		MessageID: ptrIfNotEmpty(result.MessageID),
+		ChatJID:   ptrIfNotEmpty(result.ChatJID),
+		Timestamp: ptrIfNotEmpty(result.Timestamp),
+	}, nil
 }
 
 // DownloadMedia downloads media from a message.
@@ -167,15 +149,23 @@ func (s *MessageService) DownloadMedia(messageID, chatJID string) (*domain.Downl
 		return nil, fmt.Errorf("chat_jid cannot be empty")
 	}
 
-	success, mediaType, filename, path, err := s.client.DownloadMedia(messageID, chatJID)
+	result, err := s.client.DownloadMedia(messageID, chatJID)
 	if err != nil {
 		return &domain.DownloadResult{Success: false, Message: err.Error()}, nil
 	}
 
 	return &domain.DownloadResult{
-		Success:  success,
-		Message:  fmt.Sprintf("downloaded %s", mediaType),
-		Filename: filename,
-		Path:     path,
+		Success:  result.Success,
+		Message:  fmt.Sprintf("downloaded %s", result.MediaType),
+		Filename: result.Filename,
+		Path:     result.Path,
 	}, nil
+}
+
+// ptrIfNotEmpty returns a pointer to the string if it's not empty, otherwise nil.
+func ptrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
