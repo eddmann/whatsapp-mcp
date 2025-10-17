@@ -76,9 +76,6 @@ func migrate(db *sql.DB) error {
     // Enforce FTS5 availability and initialize virtual table and triggers
     if _, err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
         content,
-        chat_jid,
-        sender,
-        timestamp UNINDEXED,
         content='messages',
         content_rowid='rowid'
     );`); err != nil {
@@ -89,8 +86,8 @@ func migrate(db *sql.DB) error {
         return err
     }
     if _, err := db.Exec(`CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
-        INSERT INTO messages_fts(rowid, content, chat_jid, sender, timestamp)
-        VALUES (new.rowid, new.content, new.chat_jid, new.sender, new.timestamp);
+        INSERT INTO messages_fts(rowid, content)
+        VALUES (new.rowid, new.content);
     END;`); err != nil {
         return err
     }
@@ -101,8 +98,8 @@ func migrate(db *sql.DB) error {
     }
     if _, err := db.Exec(`CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
         INSERT INTO messages_fts(messages_fts, rowid) VALUES('delete', old.rowid);
-        INSERT INTO messages_fts(rowid, content, chat_jid, sender, timestamp)
-        VALUES (new.rowid, new.content, new.chat_jid, new.sender, new.timestamp);
+        INSERT INTO messages_fts(rowid, content)
+        VALUES (new.rowid, new.content);
     END;`); err != nil {
         return err
     }
