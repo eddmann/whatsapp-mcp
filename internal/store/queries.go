@@ -9,6 +9,21 @@ import (
 	"github.com/eddmann/whatsapp-mcp/internal/domain"
 )
 
+// CountChats returns the total number of chats matching the query.
+func (d *DB) CountChats(query string) (int, error) {
+	q := "SELECT COUNT(*) FROM chats"
+	args := []any{}
+
+	if query != "" {
+		q += " WHERE (LOWER(name) LIKE LOWER(?) OR jid LIKE ?)"
+		args = append(args, "%"+query+"%", "%"+query+"%")
+	}
+
+	var count int
+	err := d.Messages.QueryRow(q, args...).Scan(&count)
+	return count, err
+}
+
 // ListChats returns chats with optional filtering, pagination and sorting.
 func (d *DB) ListChats(opts domain.ListChatsOptions) ([]domain.Chat, error) {
 	if opts.Limit <= 0 {
@@ -86,6 +101,9 @@ func (d *DB) ListChats(opts domain.ListChatsOptions) ([]domain.Chat, error) {
 			chat.LastMessageTime = &t
 		}
 
+		// Determine if this is a group chat
+		chat.IsGroup = strings.HasSuffix(chat.JID, "@g.us")
+
 		chats = append(chats, chat)
 	}
 
@@ -142,6 +160,9 @@ func (d *DB) GetChat(chatJID string, includeLast bool) (*domain.Chat, error) {
 		t, _ := time.Parse(time.RFC3339, ts.String)
 		chat.LastMessageTime = &t
 	}
+
+	// Determine if this is a group chat
+	chat.IsGroup = strings.HasSuffix(chat.JID, "@g.us")
 
 	if includeLast {
 		r := d.Messages.QueryRow(`SELECT content, sender, is_from_me FROM messages WHERE chat_jid = ? ORDER BY timestamp DESC LIMIT 1`, chatJID)
@@ -350,6 +371,9 @@ func (d *DB) GetDirectChatByContact(phone string) (*domain.Chat, error) {
 		chat.LastIsFromMe = &lastFromMe.Bool
 	}
 
+	// Determine if this is a group chat
+	chat.IsGroup = strings.HasSuffix(chat.JID, "@g.us")
+
 	return chat, nil
 }
 
@@ -407,6 +431,9 @@ func (d *DB) GetContactChats(jid string, limit, page int) ([]domain.Chat, error)
 		if lastFromMe.Valid {
 			chat.LastIsFromMe = &lastFromMe.Bool
 		}
+
+		// Determine if this is a group chat
+		chat.IsGroup = strings.HasSuffix(chat.JID, "@g.us")
 
 		chats = append(chats, chat)
 	}

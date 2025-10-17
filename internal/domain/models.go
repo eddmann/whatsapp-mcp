@@ -6,6 +6,7 @@ import "time"
 type Chat struct {
 	JID             string     `json:"jid"`
 	Name            *string    `json:"name,omitempty"`
+	IsGroup         bool       `json:"is_group"`
 	LastMessageTime *time.Time `json:"last_message_time,omitempty"`
 	LastMessage     *string    `json:"last_message,omitempty"`
 	LastSender      *string    `json:"last_sender,omitempty"`
