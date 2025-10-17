@@ -23,6 +23,9 @@ clean: ## Remove build artifacts
 tidy: ## Tidy go modules
 	go mod tidy
 
+format: ## Format Go source code
+	go fmt ./...
+
 ##@ Docker
 
 docker/build: ## Build Docker image locally
