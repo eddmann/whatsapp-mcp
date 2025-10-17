@@ -15,17 +15,33 @@ import (
 	"github.com/eddmann/whatsapp-mcp/internal/media"
 )
 
+// SendMessageResult represents the result of sending a WhatsApp message.
+type SendMessageResult struct {
+	Success   bool
+	Message   string
+	MessageID string
+	ChatJID   string
+	Timestamp string
+}
+
+// DownloadMediaResult represents the result of downloading media from WhatsApp.
+type DownloadMediaResult struct {
+	Success   bool
+	MediaType string
+	Filename  string
+	Path      string
+}
+
 // SendText sends a text message to a JID or phone number string (without +) or group JID.
 // If replyToMessageID is provided, sends as a quoted reply.
-// Returns: success, message, messageID, chatJID, timestamp, error
-func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, string, string, string, string, error) {
+func (c *Client) SendText(recipient, text, replyToMessageID string) (*SendMessageResult, error) {
 	if !c.WA.IsConnected() {
-		return false, "not connected", "", "", "", fmt.Errorf("not connected")
+		return &SendMessageResult{Success: false, Message: "not connected"}, fmt.Errorf("not connected")
 	}
 
 	jid, err := parseRecipient(recipient)
 	if err != nil {
-		return false, "invalid recipient", "", "", "", err
+		return &SendMessageResult{Success: false, Message: "invalid recipient"}, err
 	}
 
 	msg := &waE2E.Message{}
@@ -34,7 +50,7 @@ func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, strin
 	if replyToMessageID != "" {
 		quotedMsg, err := c.buildQuotedMessage(replyToMessageID, jid.String())
 		if err != nil {
-			return false, "failed to build quote", "", "", "", err
+			return &SendMessageResult{Success: false, Message: "failed to build quote"}, err
 		}
 
 		msg.ExtendedTextMessage = &waE2E.ExtendedTextMessage{
@@ -47,34 +63,39 @@ func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, strin
 
 	resp, err := c.WA.SendMessage(context.Background(), jid, msg)
 	if err != nil {
-		return false, err.Error(), "", "", "", err
+		return &SendMessageResult{Success: false, Message: err.Error()}, err
 	}
 
-	return true, fmt.Sprintf("sent to %s", recipient), resp.ID, jid.String(), resp.Timestamp.Format("2006-01-02T15:04:05Z07:00"), nil
+	return &SendMessageResult{
+		Success:   true,
+		Message:   fmt.Sprintf("sent to %s", recipient),
+		MessageID: resp.ID,
+		ChatJID:   jid.String(),
+		Timestamp: resp.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+	}, nil
 }
 
 // SendMedia sends an image/video/document/audio with optional caption; audio is PTT if .ogg.
 // If replyToMessageID is provided, sends as a quoted reply.
-// Returns: success, message, messageID, chatJID, timestamp, error
-func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (bool, string, string, string, string, error) {
+func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (*SendMessageResult, error) {
 	if !c.WA.IsConnected() {
-		return false, "not connected", "", "", "", fmt.Errorf("not connected")
+		return &SendMessageResult{Success: false, Message: "not connected"}, fmt.Errorf("not connected")
 	}
 
 	jid, err := parseRecipient(recipient)
 	if err != nil {
-		return false, "invalid recipient", "", "", "", err
+		return &SendMessageResult{Success: false, Message: "invalid recipient"}, err
 	}
 
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return false, "read error", "", "", "", err
+		return &SendMessageResult{Success: false, Message: "read error"}, err
 	}
 
 	mediaType, mime := classify(path)
 	up, err := c.WA.Upload(context.Background(), b, mediaType)
 	if err != nil {
-		return false, "upload failed", "", "", "", err
+		return &SendMessageResult{Success: false, Message: "upload failed"}, err
 	}
 
 	m := &waE2E.Message{}
@@ -85,7 +106,7 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (b
 	if replyToMessageID != "" {
 		quotedCtx, err = c.buildQuotedMessage(replyToMessageID, jid.String())
 		if err != nil {
-			return false, "failed to build quote", "", "", "", err
+			return &SendMessageResult{Success: false, Message: "failed to build quote"}, err
 		}
 	}
 
@@ -132,18 +153,18 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (b
 		if !isOgg(path) {
 			cpath, err := media.ConvertToOpusOgg(path)
 			if err != nil {
-				return false, "conversion failed", "", "", "", err
+				return &SendMessageResult{Success: false, Message: "conversion failed"}, err
 			}
 			defer func() { _ = os.Remove(cpath) }()
 
 			b2, err := os.ReadFile(cpath)
 			if err != nil {
-				return false, "read converted", "", "", "", err
+				return &SendMessageResult{Success: false, Message: "read converted"}, err
 			}
 
 			up2, err := c.WA.Upload(context.Background(), b2, whatsmeow.MediaAudio)
 			if err != nil {
-				return false, "upload converted", "", "", "", err
+				return &SendMessageResult{Success: false, Message: "upload converted"}, err
 			}
 
 			dur, waveform, _ := media.AnalyzeOggOpus(b2)
@@ -180,25 +201,31 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (b
 
 	resp, err := c.WA.SendMessage(context.Background(), jid, m)
 	if err != nil {
-		return false, err.Error(), "", "", "", err
+		return &SendMessageResult{Success: false, Message: err.Error()}, err
 	}
 
-	return true, fmt.Sprintf("sent media to %s", recipient), resp.ID, jid.String(), resp.Timestamp.Format("2006-01-02T15:04:05Z07:00"), nil
+	return &SendMessageResult{
+		Success:   true,
+		Message:   fmt.Sprintf("sent media to %s", recipient),
+		MessageID: resp.ID,
+		ChatJID:   jid.String(),
+		Timestamp: resp.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+	}, nil
 }
 
 // DownloadMedia looks up media from DB and downloads via whatsmeow.
-func (c *Client) DownloadMedia(messageID, chatJID string) (bool, string, string, string, error) {
+func (c *Client) DownloadMedia(messageID, chatJID string) (*DownloadMediaResult, error) {
 	var mediaType, filename, url string
 	var mediaKey, fileSHA256, fileEncSHA256 []byte
 	var fileLength uint64
 
 	row := c.Store.Messages.QueryRow("SELECT media_type, filename, url, media_key, file_sha256, file_enc_sha256, file_length FROM messages WHERE id = ? AND chat_jid = ?", messageID, chatJID)
 	if err := row.Scan(&mediaType, &filename, &url, &mediaKey, &fileSHA256, &fileEncSHA256, &fileLength); err != nil {
-		return false, "", "", "", err
+		return &DownloadMediaResult{Success: false}, err
 	}
 
 	if mediaType == "" || url == "" || len(mediaKey) == 0 || len(fileSHA256) == 0 || len(fileEncSHA256) == 0 || fileLength == 0 {
-		return false, "", "", "", fmt.Errorf("incomplete media info")
+		return &DownloadMediaResult{Success: false}, fmt.Errorf("incomplete media info")
 	}
 
 	dp := extractDirectPathFromURL(url)
@@ -214,21 +241,26 @@ func (c *Client) DownloadMedia(messageID, chatJID string) (bool, string, string,
 
 	data, err := c.WA.Download(context.Background(), dm)
 	if err != nil {
-		return false, "", "", "", err
+		return &DownloadMediaResult{Success: false}, err
 	}
 
 	outDir := filepath.Join(c.BaseDir, strings.ReplaceAll(chatJID, ":", "_"))
 	if err := os.MkdirAll(outDir, 0755); err != nil {
-		return false, "", "", "", err
+		return &DownloadMediaResult{Success: false}, err
 	}
 
 	out := filepath.Join(outDir, filename)
 	if err := os.WriteFile(out, data, fs.FileMode(0644)); err != nil {
-		return false, "", "", "", err
+		return &DownloadMediaResult{Success: false}, err
 	}
 
 	abs, _ := filepath.Abs(out)
-	return true, mediaType, filename, abs, nil
+	return &DownloadMediaResult{
+		Success:   true,
+		MediaType: mediaType,
+		Filename:  filename,
+		Path:      abs,
+	}, nil
 }
 
 // protoString returns a pointer to a string (for protobuf).
