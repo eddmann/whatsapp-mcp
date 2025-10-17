@@ -465,24 +465,52 @@ func (d *DB) SearchMessages(opts domain.SearchMessagesOptions) ([]domain.Message
 		opts.Page = 0
 	}
 
+	// Build date filter conditions
+	dateWhere := []string{}
+	dateArgs := []any{}
+	if opts.After != "" {
+		dateWhere = append(dateWhere, "m.timestamp > ?")
+		dateArgs = append(dateArgs, opts.After)
+	}
+	if opts.Before != "" {
+		dateWhere = append(dateWhere, "m.timestamp < ?")
+		dateArgs = append(dateArgs, opts.Before)
+	}
+
 	// Try FTS5
-	rows, err := d.Messages.Query(`
+	ftsQuery := `
 		SELECT m.timestamp, m.sender, c.name, m.content, m.is_from_me, m.chat_jid, m.id, m.media_type
 		FROM messages_fts f
 		JOIN messages m ON m.rowid = f.rowid
 		JOIN chats c ON m.chat_jid = c.jid
-		WHERE messages_fts MATCH ?
-		ORDER BY m.timestamp DESC
-		LIMIT ? OFFSET ?`, opts.Query, opts.Limit, opts.Page*opts.Limit)
+		WHERE messages_fts MATCH ?`
+
+	ftsArgs := []any{opts.Query}
+	if len(dateWhere) > 0 {
+		ftsQuery += " AND " + strings.Join(dateWhere, " AND ")
+		ftsArgs = append(ftsArgs, dateArgs...)
+	}
+	ftsQuery += " ORDER BY m.timestamp DESC LIMIT ? OFFSET ?"
+	ftsArgs = append(ftsArgs, opts.Limit, opts.Page*opts.Limit)
+
+	rows, err := d.Messages.Query(ftsQuery, ftsArgs...)
 
 	if err != nil {
 		// Fallback to LIKE
-		rows, err = d.Messages.Query(`
+		likeQuery := `
 			SELECT m.timestamp, m.sender, c.name, m.content, m.is_from_me, m.chat_jid, m.id, m.media_type
 			FROM messages m JOIN chats c ON m.chat_jid = c.jid
-			WHERE LOWER(m.content) LIKE LOWER(?)
-			ORDER BY m.timestamp DESC
-			LIMIT ? OFFSET ?`, "%"+opts.Query+"%", opts.Limit, opts.Page*opts.Limit)
+			WHERE LOWER(m.content) LIKE LOWER(?)`
+
+		likeArgs := []any{"%"+opts.Query+"%"}
+		if len(dateWhere) > 0 {
+			likeQuery += " AND " + strings.Join(dateWhere, " AND ")
+			likeArgs = append(likeArgs, dateArgs...)
+		}
+		likeQuery += " ORDER BY m.timestamp DESC LIMIT ? OFFSET ?"
+		likeArgs = append(likeArgs, opts.Limit, opts.Page*opts.Limit)
+
+		rows, err = d.Messages.Query(likeQuery, likeArgs...)
 		if err != nil {
 			return nil, err
 		}

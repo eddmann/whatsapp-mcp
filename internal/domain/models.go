@@ -79,7 +79,9 @@ type ListMessagesOptions struct {
 
 // SearchMessagesOptions contains options for searching messages.
 type SearchMessagesOptions struct {
-	Query string
-	Limit int
-	Page  int
+	Query  string
+	After  string
+	Before string
+	Limit  int
+	Page   int
 }
