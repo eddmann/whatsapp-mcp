@@ -63,37 +63,37 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 	switch mediaType {
 	case whatsmeow.MediaImage:
 		m.ImageMessage = &waE2E.ImageMessage{
-			Caption:        protoString(caption),
-			Mimetype:       protoString(mime),
-			URL:            &up.URL,
-			DirectPath:     &up.DirectPath,
-			MediaKey:       up.MediaKey,
-			FileEncSHA256:  up.FileEncSHA256,
-			FileSHA256:     up.FileSHA256,
-			FileLength:     &up.FileLength,
+			Caption:       protoString(caption),
+			Mimetype:      protoString(mime),
+			URL:           &up.URL,
+			DirectPath:    &up.DirectPath,
+			MediaKey:      up.MediaKey,
+			FileEncSHA256: up.FileEncSHA256,
+			FileSHA256:    up.FileSHA256,
+			FileLength:    &up.FileLength,
 		}
 	case whatsmeow.MediaVideo:
 		m.VideoMessage = &waE2E.VideoMessage{
-			Caption:        protoString(caption),
-			Mimetype:       protoString(mime),
-			URL:            &up.URL,
-			DirectPath:     &up.DirectPath,
-			MediaKey:       up.MediaKey,
-			FileEncSHA256:  up.FileEncSHA256,
-			FileSHA256:     up.FileSHA256,
-			FileLength:     &up.FileLength,
+			Caption:       protoString(caption),
+			Mimetype:      protoString(mime),
+			URL:           &up.URL,
+			DirectPath:    &up.DirectPath,
+			MediaKey:      up.MediaKey,
+			FileEncSHA256: up.FileEncSHA256,
+			FileSHA256:    up.FileSHA256,
+			FileLength:    &up.FileLength,
 		}
 	case whatsmeow.MediaDocument:
 		m.DocumentMessage = &waE2E.DocumentMessage{
-			Title:          protoString(base),
-			Caption:        protoString(caption),
-			Mimetype:       protoString(mime),
-			URL:            &up.URL,
-			DirectPath:     &up.DirectPath,
-			MediaKey:       up.MediaKey,
-			FileEncSHA256:  up.FileEncSHA256,
-			FileSHA256:     up.FileSHA256,
-			FileLength:     &up.FileLength,
+			Title:         protoString(base),
+			Caption:       protoString(caption),
+			Mimetype:      protoString(mime),
+			URL:           &up.URL,
+			DirectPath:    &up.DirectPath,
+			MediaKey:      up.MediaKey,
+			FileEncSHA256: up.FileEncSHA256,
+			FileSHA256:    up.FileSHA256,
+			FileLength:    &up.FileLength,
 		}
 	case whatsmeow.MediaAudio:
 		// If not .ogg, convert via ffmpeg
@@ -116,30 +116,30 @@ func (c *Client) SendMedia(recipient, path, caption string) (bool, string, error
 
 			dur, waveform, _ := media.AnalyzeOggOpus(b2)
 			m.AudioMessage = &waE2E.AudioMessage{
-				Mimetype:       protoString("audio/ogg; codecs=opus"),
-				URL:            &up2.URL,
-				DirectPath:     &up2.DirectPath,
-				MediaKey:       up2.MediaKey,
-				FileEncSHA256:  up2.FileEncSHA256,
-				FileSHA256:     up2.FileSHA256,
-				FileLength:     &up2.FileLength,
-				Seconds:        protoUint32(uint32(dur)),
-				PTT:            protoBool(true),
-				Waveform:       waveform,
+				Mimetype:      protoString("audio/ogg; codecs=opus"),
+				URL:           &up2.URL,
+				DirectPath:    &up2.DirectPath,
+				MediaKey:      up2.MediaKey,
+				FileEncSHA256: up2.FileEncSHA256,
+				FileSHA256:    up2.FileSHA256,
+				FileLength:    &up2.FileLength,
+				Seconds:       protoUint32(uint32(dur)),
+				PTT:           protoBool(true),
+				Waveform:      waveform,
 			}
 		} else {
 			dur, waveform, _ := media.AnalyzeOggOpus(b)
 			m.AudioMessage = &waE2E.AudioMessage{
-				Mimetype:       protoString(mime),
-				URL:            &up.URL,
-				DirectPath:     &up.DirectPath,
-				MediaKey:       up.MediaKey,
-				FileEncSHA256:  up.FileEncSHA256,
-				FileSHA256:     up.FileSHA256,
-				FileLength:     &up.FileLength,
-				Seconds:        protoUint32(uint32(dur)),
-				PTT:            protoBool(true),
-				Waveform:       waveform,
+				Mimetype:      protoString(mime),
+				URL:           &up.URL,
+				DirectPath:    &up.DirectPath,
+				MediaKey:      up.MediaKey,
+				FileEncSHA256: up.FileEncSHA256,
+				FileSHA256:    up.FileSHA256,
+				FileLength:    &up.FileLength,
+				Seconds:       protoUint32(uint32(dur)),
+				PTT:           protoBool(true),
+				Waveform:      waveform,
 			}
 		}
 	}

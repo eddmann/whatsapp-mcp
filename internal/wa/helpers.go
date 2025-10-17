@@ -151,10 +151,10 @@ type downloadable struct {
 	MediaType     whatsmeow.MediaType
 }
 
-func (d *downloadable) GetDirectPath() string               { return d.DirectPath }
-func (d *downloadable) GetURL() string                      { return d.URL }
-func (d *downloadable) GetMediaKey() []byte                 { return d.MediaKey }
-func (d *downloadable) GetFileLength() uint64               { return d.FileLength }
-func (d *downloadable) GetFileSHA256() []byte               { return d.FileSHA256 }
-func (d *downloadable) GetFileEncSHA256() []byte            { return d.FileEncSHA256 }
+func (d *downloadable) GetDirectPath() string             { return d.DirectPath }
+func (d *downloadable) GetURL() string                    { return d.URL }
+func (d *downloadable) GetMediaKey() []byte               { return d.MediaKey }
+func (d *downloadable) GetFileLength() uint64             { return d.FileLength }
+func (d *downloadable) GetFileSHA256() []byte             { return d.FileSHA256 }
+func (d *downloadable) GetFileEncSHA256() []byte          { return d.FileEncSHA256 }
 func (d *downloadable) GetMediaType() whatsmeow.MediaType { return d.MediaType }

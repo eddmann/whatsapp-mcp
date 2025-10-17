@@ -15,15 +15,15 @@ type Chat struct {
 
 // Message represents a WhatsApp message.
 type Message struct {
-	ID          string     `json:"id"`
-	ChatJID     string     `json:"chat_jid"`
-	Sender      string     `json:"sender"`
-	Content     *string    `json:"content,omitempty"`
-	Timestamp   time.Time  `json:"timestamp"`
-	IsFromMe    bool       `json:"is_from_me"`
-	MediaType   *string    `json:"media_type,omitempty"`
-	Filename    *string    `json:"filename,omitempty"`
-	ChatName    *string    `json:"chat_name,omitempty"`
+	ID        string    `json:"id"`
+	ChatJID   string    `json:"chat_jid"`
+	Sender    string    `json:"sender"`
+	Content   *string   `json:"content,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	IsFromMe  bool      `json:"is_from_me"`
+	MediaType *string   `json:"media_type,omitempty"`
+	Filename  *string   `json:"filename,omitempty"`
+	ChatName  *string   `json:"chat_name,omitempty"`
 }
 
 // MessageContext represents a message with surrounding context.
