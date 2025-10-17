@@ -17,14 +17,15 @@ import (
 
 // SendText sends a text message to a JID or phone number string (without +) or group JID.
 // If replyToMessageID is provided, sends as a quoted reply.
-func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, string, error) {
+// Returns: success, message, messageID, chatJID, timestamp, error
+func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, string, string, string, string, error) {
 	if !c.WA.IsConnected() {
-		return false, "not connected", fmt.Errorf("not connected")
+		return false, "not connected", "", "", "", fmt.Errorf("not connected")
 	}
 
 	jid, err := parseRecipient(recipient)
 	if err != nil {
-		return false, "invalid recipient", err
+		return false, "invalid recipient", "", "", "", err
 	}
 
 	msg := &waE2E.Message{}
@@ -33,7 +34,7 @@ func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, strin
 	if replyToMessageID != "" {
 		quotedMsg, err := c.buildQuotedMessage(replyToMessageID, jid.String())
 		if err != nil {
-			return false, "failed to build quote", err
+			return false, "failed to build quote", "", "", "", err
 		}
 
 		msg.ExtendedTextMessage = &waE2E.ExtendedTextMessage{
@@ -44,35 +45,36 @@ func (c *Client) SendText(recipient, text, replyToMessageID string) (bool, strin
 		msg.Conversation = protoString(text)
 	}
 
-	_, err = c.WA.SendMessage(context.Background(), jid, msg)
+	resp, err := c.WA.SendMessage(context.Background(), jid, msg)
 	if err != nil {
-		return false, err.Error(), err
+		return false, err.Error(), "", "", "", err
 	}
 
-	return true, fmt.Sprintf("sent to %s", recipient), nil
+	return true, fmt.Sprintf("sent to %s", recipient), resp.ID, jid.String(), resp.Timestamp.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // SendMedia sends an image/video/document/audio with optional caption; audio is PTT if .ogg.
 // If replyToMessageID is provided, sends as a quoted reply.
-func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (bool, string, error) {
+// Returns: success, message, messageID, chatJID, timestamp, error
+func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (bool, string, string, string, string, error) {
 	if !c.WA.IsConnected() {
-		return false, "not connected", fmt.Errorf("not connected")
+		return false, "not connected", "", "", "", fmt.Errorf("not connected")
 	}
 
 	jid, err := parseRecipient(recipient)
 	if err != nil {
-		return false, "invalid recipient", err
+		return false, "invalid recipient", "", "", "", err
 	}
 
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return false, "read error", err
+		return false, "read error", "", "", "", err
 	}
 
 	mediaType, mime := classify(path)
 	up, err := c.WA.Upload(context.Background(), b, mediaType)
 	if err != nil {
-		return false, "upload failed", err
+		return false, "upload failed", "", "", "", err
 	}
 
 	m := &waE2E.Message{}
@@ -83,7 +85,7 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (b
 	if replyToMessageID != "" {
 		quotedCtx, err = c.buildQuotedMessage(replyToMessageID, jid.String())
 		if err != nil {
-			return false, "failed to build quote", err
+			return false, "failed to build quote", "", "", "", err
 		}
 	}
 
@@ -130,18 +132,18 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (b
 		if !isOgg(path) {
 			cpath, err := media.ConvertToOpusOgg(path)
 			if err != nil {
-				return false, "conversion failed", err
+				return false, "conversion failed", "", "", "", err
 			}
 			defer func() { _ = os.Remove(cpath) }()
 
 			b2, err := os.ReadFile(cpath)
 			if err != nil {
-				return false, "read converted", err
+				return false, "read converted", "", "", "", err
 			}
 
 			up2, err := c.WA.Upload(context.Background(), b2, whatsmeow.MediaAudio)
 			if err != nil {
-				return false, "upload converted", err
+				return false, "upload converted", "", "", "", err
 			}
 
 			dur, waveform, _ := media.AnalyzeOggOpus(b2)
@@ -176,12 +178,12 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (b
 		}
 	}
 
-	_, err = c.WA.SendMessage(context.Background(), jid, m)
+	resp, err := c.WA.SendMessage(context.Background(), jid, m)
 	if err != nil {
-		return false, err.Error(), err
+		return false, err.Error(), "", "", "", err
 	}
 
-	return true, fmt.Sprintf("sent media to %s", recipient), nil
+	return true, fmt.Sprintf("sent media to %s", recipient), resp.ID, jid.String(), resp.Timestamp.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // DownloadMedia looks up media from DB and downloads via whatsmeow.
