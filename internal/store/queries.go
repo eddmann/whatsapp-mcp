@@ -152,11 +152,11 @@ func (d *DB) ListMessages(opts domain.ListMessagesOptions) ([]domain.Message, er
 	args := []any{}
 
 	if opts.After != "" {
-		where = append(where, "messages.timestamp > ?")
+		where = append(where, "datetime(messages.timestamp) > datetime(?)")
 		args = append(args, opts.After)
 	}
 	if opts.Before != "" {
-		where = append(where, "messages.timestamp < ?")
+		where = append(where, "datetime(messages.timestamp) < datetime(?)")
 		args = append(args, opts.Before)
 	}
 	if opts.ChatJID != "" {
@@ -208,11 +208,11 @@ func (d *DB) SearchMessages(opts domain.SearchMessagesOptions) ([]domain.Message
 	dateWhere := []string{}
 	dateArgs := []any{}
 	if opts.After != "" {
-		dateWhere = append(dateWhere, "m.timestamp > ?")
+		dateWhere = append(dateWhere, "datetime(m.timestamp) > datetime(?)")
 		dateArgs = append(dateArgs, opts.After)
 	}
 	if opts.Before != "" {
-		dateWhere = append(dateWhere, "m.timestamp < ?")
+		dateWhere = append(dateWhere, "datetime(m.timestamp) < datetime(?)")
 		dateArgs = append(dateArgs, opts.Before)
 	}
 
@@ -269,7 +269,7 @@ func (d *DB) SearchMessages(opts domain.SearchMessagesOptions) ([]domain.Message
 		for _, base := range messages {
 			expanded = append(expanded, base)
 
-			beforeRows, err := d.Messages.Query(`SELECT messages.timestamp, messages.sender, chats.name, messages.content, messages.is_from_me, chats.jid, messages.id, messages.media_type FROM messages JOIN chats ON messages.chat_jid = chats.jid WHERE messages.chat_jid = ? AND messages.timestamp < ? ORDER BY messages.timestamp DESC LIMIT ?`, base.ChatJID, base.Timestamp.Format(time.RFC3339), contextSize)
+			beforeRows, err := d.Messages.Query(`SELECT messages.timestamp, messages.sender, chats.name, messages.content, messages.is_from_me, chats.jid, messages.id, messages.media_type FROM messages JOIN chats ON messages.chat_jid = chats.jid WHERE messages.chat_jid = ? AND datetime(messages.timestamp) < datetime(?) ORDER BY messages.timestamp DESC LIMIT ?`, base.ChatJID, base.Timestamp.Format(time.RFC3339), contextSize)
 			if err == nil {
 				for beforeRows.Next() {
 					msg, err := scanMessage(beforeRows)
@@ -280,7 +280,7 @@ func (d *DB) SearchMessages(opts domain.SearchMessagesOptions) ([]domain.Message
 				beforeRows.Close()
 			}
 
-			afterRows, err := d.Messages.Query(`SELECT messages.timestamp, messages.sender, chats.name, messages.content, messages.is_from_me, chats.jid, messages.id, messages.media_type FROM messages JOIN chats ON messages.chat_jid = chats.jid WHERE messages.chat_jid = ? AND messages.timestamp > ? ORDER BY messages.timestamp ASC LIMIT ?`, base.ChatJID, base.Timestamp.Format(time.RFC3339), contextSize)
+			afterRows, err := d.Messages.Query(`SELECT messages.timestamp, messages.sender, chats.name, messages.content, messages.is_from_me, chats.jid, messages.id, messages.media_type FROM messages JOIN chats ON messages.chat_jid = chats.jid WHERE messages.chat_jid = ? AND datetime(messages.timestamp) > datetime(?) ORDER BY messages.timestamp ASC LIMIT ?`, base.ChatJID, base.Timestamp.Format(time.RFC3339), contextSize)
 			if err == nil {
 				for afterRows.Next() {
 					msg, err := scanMessage(afterRows)
@@ -334,7 +334,7 @@ func (d *DB) GetActiveChats(after, before string, onlyGroups bool, limit int) ([
 			c.last_message_time
 		FROM chats c
 		JOIN messages m ON c.jid = m.chat_jid
-		WHERE m.timestamp > ? AND m.timestamp < ?
+		WHERE datetime(m.timestamp) > datetime(?) AND datetime(m.timestamp) < datetime(?)
 	`
 
 	args := []any{after, before}
@@ -398,7 +398,7 @@ func (d *DB) GetQuestionsForMe(after, before string, limit int) ([]domain.Messag
 		SELECT m.timestamp, m.sender, c.name, m.content, m.is_from_me, m.chat_jid, m.id, m.media_type
 		FROM messages m
 		JOIN chats c ON m.chat_jid = c.jid
-		WHERE m.timestamp > ? AND m.timestamp < ?
+		WHERE datetime(m.timestamp) > datetime(?) AND datetime(m.timestamp) < datetime(?)
 		AND m.is_from_me = 0
 		AND m.content LIKE '%?'
 		ORDER BY m.timestamp DESC
@@ -431,7 +431,7 @@ func (d *DB) GetMediaSummary(after, before string) (*domain.MediaSummary, error)
 			media_type,
 			COUNT(*) as count
 		FROM messages
-		WHERE timestamp > ? AND timestamp < ?
+		WHERE datetime(timestamp) > datetime(?) AND datetime(timestamp) < datetime(?)
 		AND media_type IS NOT NULL
 		GROUP BY media_type
 	`
@@ -466,7 +466,7 @@ func (d *DB) GetMediaSummary(after, before string) (*domain.MediaSummary, error)
 		SELECT DISTINCT c.name
 		FROM messages m
 		JOIN chats c ON m.chat_jid = c.jid
-		WHERE m.timestamp > ? AND m.timestamp < ?
+		WHERE datetime(m.timestamp) > datetime(?) AND datetime(m.timestamp) < datetime(?)
 		AND m.media_type IS NOT NULL
 		LIMIT 10
 	`

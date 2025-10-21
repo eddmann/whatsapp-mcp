@@ -172,7 +172,7 @@ func (s *MessageService) CatchUp(opts domain.CatchUpOptions) (*domain.CatchUpSum
 	}
 
 	var totalCount int
-	query := "SELECT COUNT(*) FROM messages WHERE timestamp > ? AND timestamp < ?"
+	query := "SELECT COUNT(*) FROM messages WHERE datetime(timestamp) > datetime(?) AND datetime(timestamp) < datetime(?)"
 	s.store.Messages.QueryRow(query, after, before).Scan(&totalCount)
 	summary.TotalMessages = totalCount
 
