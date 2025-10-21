@@ -13,14 +13,12 @@ import (
 // getChatName attempts to resolve a friendly chat name using existing DB,
 // conversation metadata, group info, or contacts.
 func (c *Client) getChatName(jid types.JID, chatJID string, conversation any, sender string) string {
-	// Existing stored name
 	var existing sql.NullString
 	_ = c.Store.Messages.QueryRow("SELECT name FROM chats WHERE jid = ?", chatJID).Scan(&existing)
 	if existing.Valid && existing.String != "" {
 		return existing.String
 	}
 
-	// Try to extract from conversation (DisplayName or Name), using reflection to avoid tight coupling
 	if conversation != nil {
 		v := reflect.ValueOf(conversation)
 		if v.Kind() == reflect.Ptr && !v.IsNil() {
@@ -40,7 +38,6 @@ func (c *Client) getChatName(jid types.JID, chatJID string, conversation any, se
 		}
 	}
 
-	// Groups
 	if jid.Server == "g.us" {
 		if info, err := c.WA.GetGroupInfo(jid); err == nil && info.Name != "" {
 			return info.Name
@@ -48,7 +45,6 @@ func (c *Client) getChatName(jid types.JID, chatJID string, conversation any, se
 		return fmt.Sprintf("Group %s", jid.User)
 	}
 
-	// Contacts
 	if contact, err := c.WA.Store.Contacts.GetContact(context.Background(), jid); err == nil {
 		if contact.FullName != "" {
 			return contact.FullName
@@ -79,7 +75,6 @@ func (c *Client) resolvePreferredName(jid types.JID) string {
 		return fmt.Sprintf("Group %s", jid.User)
 	}
 
-	// Contacts
 	if contact, err := c.WA.Store.Contacts.GetContact(context.Background(), jid); err == nil {
 		if contact.FullName != "" {
 			return contact.FullName
@@ -102,17 +97,13 @@ func (c *Client) ResolveRecipient(recipient string) (string, error) {
 		return "", fmt.Errorf("recipient cannot be empty")
 	}
 
-	// 1. If it looks like a JID or phone number, try direct parsing
 	if strings.Contains(recipient, "@") {
-		// Contains @, likely a full JID
 		jid, err := types.ParseJID(recipient)
 		if err == nil {
 			return jid.String(), nil
 		}
-		// Invalid JID, fall through to name search
 	}
 
-	// Check if it's all digits (phone number)
 	isPhone := true
 	for _, ch := range recipient {
 		if ch < '0' || ch > '9' {
@@ -121,11 +112,9 @@ func (c *Client) ResolveRecipient(recipient string) (string, error) {
 		}
 	}
 	if isPhone && len(recipient) > 5 {
-		// Looks like a phone number, construct JID
 		return fmt.Sprintf("%s@s.whatsapp.net", recipient), nil
 	}
 
-	// 2. Assume it's a name, search chats (includes both contacts and groups)
 	pattern := "%" + strings.ToLower(recipient) + "%"
 	rows, err := c.Store.Messages.Query(`
 		SELECT jid, name FROM chats
@@ -151,7 +140,6 @@ func (c *Client) ResolveRecipient(recipient string) (string, error) {
 		matches = append(matches, match{jid: jid, name: name.String})
 	}
 
-	// 3. Handle results
 	if len(matches) == 0 {
 		return "", fmt.Errorf("no contact or group found matching '%s'. Use phone number (e.g., 441234567890) or full JID (e.g., 123456@g.us)", recipient)
 	}
@@ -160,7 +148,6 @@ func (c *Client) ResolveRecipient(recipient string) (string, error) {
 		return matches[0].jid, nil
 	}
 
-	// Multiple matches - provide disambiguation
 	var suggestions []string
 	for _, m := range matches {
 		if m.name != "" {
@@ -199,21 +186,18 @@ func (c *Client) backfillChatNames() {
 			continue
 		}
 
-		// Skip groups here; resolvePreferredName handles them but they usually already have names
 		parsed, err := types.ParseJID(jidStr)
 		if err != nil {
 			continue
 		}
 
 		if parsed.Server == "g.us" {
-			// update groups if missing a name
 			if name == "" || name == parsed.User {
 				toUpdate = append(toUpdate, row{jid: jidStr, name: name})
 			}
 			continue
 		}
 
-		// For individual chats: consider missing or numeric-like names as needing backfill
 		phone := parsed.User
 		if name == "" || name == phone || strings.HasSuffix(name, "@s.whatsapp.net") {
 			toUpdate = append(toUpdate, row{jid: jidStr, name: name})

@@ -53,14 +53,14 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 **cmd/whatsapp-mcp/main.go**
 
 - Entry point: initializes store, WhatsApp client, services, and MCP server
-- Registers 14 MCP tools covering chats, messages, search, messaging, media, and status
+- Registers 7 MCP tools covering chats, messages, search, messaging, media, and status
 - Handles graceful shutdown (SIGINT/SIGTERM) to disconnect WhatsApp and close DBs
 - Runs WhatsApp connection in background goroutine with QR authentication
 - Serves MCP over stdio using mark3labs/mcp-go
 
 **Tools registered:**
-- Chat management: `list_chats`, `get_chat`, `search_contacts`, `get_direct_chat_by_contact`, `get_contact_chats`
-- Message operations: `list_messages`, `get_message_context`, `get_last_interaction`, `search_messages` (with date filters)
+- Chat management: `list_chats`
+- Message operations: `list_messages`, `search_messages` (with date filters), `catch_up` (intelligent activity summary)
 - Messaging: `send_message` (unified tool for text, media, or both with fuzzy name matching and reply/threading)
 - Media: `download_media`
 - Status: `get_connection_status`

@@ -111,15 +111,3 @@ func migrate(db *sql.DB) error {
 	_, _ = db.Exec(`INSERT INTO messages_fts(messages_fts) VALUES('rebuild')`)
 	return nil
 }
-
-func optionalExec(db *sql.DB, q string) error {
-	if _, err := db.Exec(q); err != nil {
-		if strings.Contains(err.Error(), "fts5") {
-			return nil
-		}
-		return err
-	}
-	return nil
-}
-
-// MListChats returns chats with optional basic fields.

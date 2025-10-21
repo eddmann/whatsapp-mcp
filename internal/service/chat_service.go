@@ -19,7 +19,6 @@ func NewChatService(store *store.DB) *ChatService {
 
 // ListChats lists chats with optional filtering, pagination and sorting.
 func (s *ChatService) ListChats(opts domain.ListChatsOptions) ([]domain.Chat, error) {
-	// Validation
 	if opts.Limit > 200 {
 		return nil, fmt.Errorf("limit cannot exceed 200")
 	}
@@ -33,15 +32,6 @@ func (s *ChatService) ListChats(opts domain.ListChatsOptions) ([]domain.Chat, er
 	return s.store.ListChats(opts)
 }
 
-// SearchContacts searches for contacts by name or JID.
-func (s *ChatService) SearchContacts(query string) ([]domain.Contact, error) {
-	if query == "" {
-		return nil, fmt.Errorf("query cannot be empty")
-	}
-
-	return s.store.SearchContacts(query)
-}
-
 // GetChat retrieves a single chat by JID.
 func (s *ChatService) GetChat(chatJID string, includeLast bool) (*domain.Chat, error) {
 	if chatJID == "" {
@@ -49,32 +39,4 @@ func (s *ChatService) GetChat(chatJID string, includeLast bool) (*domain.Chat, e
 	}
 
 	return s.store.GetChat(chatJID, includeLast)
-}
-
-// GetDirectChatByContact retrieves a direct chat by phone number.
-func (s *ChatService) GetDirectChatByContact(phone string) (*domain.Chat, error) {
-	if phone == "" {
-		return nil, fmt.Errorf("phone cannot be empty")
-	}
-
-	return s.store.GetDirectChatByContact(phone)
-}
-
-// GetContactChats retrieves chats involving a contact.
-func (s *ChatService) GetContactChats(jid string, limit, page int) ([]domain.Chat, error) {
-	if jid == "" {
-		return nil, fmt.Errorf("jid cannot be empty")
-	}
-
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 200 {
-		return nil, fmt.Errorf("limit cannot exceed 200")
-	}
-	if page < 0 {
-		page = 0
-	}
-
-	return s.store.GetContactChats(jid, limit, page)
 }

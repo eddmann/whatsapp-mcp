@@ -46,7 +46,6 @@ func (c *Client) SendText(recipient, text, replyToMessageID string) (*SendMessag
 
 	msg := &waE2E.Message{}
 
-	// If replying to a message, construct quoted reply
 	if replyToMessageID != "" {
 		quotedMsg, err := c.buildQuotedMessage(replyToMessageID, jid.String())
 		if err != nil {
@@ -101,7 +100,6 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (*
 	m := &waE2E.Message{}
 	base := filepath.Base(path)
 
-	// Build quoted message context if replying
 	var quotedCtx *waE2E.ContextInfo
 	if replyToMessageID != "" {
 		quotedCtx, err = c.buildQuotedMessage(replyToMessageID, jid.String())
@@ -149,7 +147,6 @@ func (c *Client) SendMedia(recipient, path, caption, replyToMessageID string) (*
 			ContextInfo:   quotedCtx,
 		}
 	case whatsmeow.MediaAudio:
-		// If not .ogg, convert via ffmpeg
 		if !isOgg(path) {
 			cpath, err := media.ConvertToOpusOgg(path)
 			if err != nil {
