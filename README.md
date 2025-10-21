@@ -170,15 +170,15 @@ Ask Claude to interact with your WhatsApp data using natural language.
 
 ## Available Tools
 
-| Tool                    | Category     | Description                                                                                                                             |
-| ----------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_chats`            | Chats        | List conversations with message previews, sorted by recent activity. Filter by name/phone/groups-only. Supports pagination.             |
-| `list_messages`         | Messages     | List messages from a conversation. Filter by contact/group name and date range using natural timeframes (today, this_week, etc).        |
-| `search_messages`       | Search       | Full-text search with FTS5 across all messages. Supports keywords, phrases, boolean operators, and date filters.                        |
-| `send_message`          | Messaging    | Send text, media (image/video/audio/document), or both to contacts/groups. Fuzzy name matching and message reply/threading support.     |
-| `download_media`        | Media        | Download media files (image/video/audio/document) from messages to local storage organized by chat.                                     |
-| `get_connection_status` | Status       | Check WhatsApp connection status, login state, device info, and database statistics (chat and message counts).                          |
-| `catch_up`              | Intelligence | Intelligent activity summary showing active chats with recent messages, questions directed at you, media activity, and attention flags. |
+| Tool                    | Description                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_chats`            | List conversations with message previews, sorted by recent activity. Filter by name/phone/groups-only. Supports pagination.             |
+| `list_messages`         | List messages from a conversation. Filter by contact/group name and date range using natural timeframes (today, this_week, etc).        |
+| `search_messages`       | Full-text search with FTS5 across all messages. Supports keywords, phrases, boolean operators, and date filters.                        |
+| `send_message`          | Send text, media (image/video/audio/document), or both to contacts/groups. Fuzzy name matching and message reply/threading support.     |
+| `download_media`        | Download media files (image/video/audio/document) from messages to local storage organized by chat.                                     |
+| `get_connection_status` | Check WhatsApp connection status, login state, device info, and database statistics (chat and message counts).                          |
+| `catch_up`              | Intelligent activity summary showing active chats with recent messages, questions directed at you, media activity, and attention flags. |
 
 ## License
 
