@@ -40,7 +40,6 @@ func Load() (*Config, error) {
 		},
 	}
 
-	// Parse log level
 	logLevelStr := getEnv("LOG_LEVEL", "INFO")
 	cfg.LogLevel = parseLogLevel(logLevelStr)
 

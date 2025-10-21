@@ -58,33 +58,71 @@ type DownloadResult struct {
 }
 
 // ListChatsOptions contains options for listing chats.
+// Always sorted by last activity and includes last message preview.
 type ListChatsOptions struct {
-	Query              string
-	Limit              int
-	Page               int
-	SortBy             string
-	IncludeLastMessage bool
+	Query      string
+	OnlyGroups bool
+	Limit      int
+	Page       int
 }
 
 // ListMessagesOptions contains options for listing messages.
 type ListMessagesOptions struct {
-	After          string
-	Before         string
-	Sender         string
-	ChatJID        string
-	Query          string
-	Limit          int
-	Page           int
-	IncludeContext bool
-	ContextBefore  int
-	ContextAfter   int
+	After     string
+	Before    string
+	Timeframe string // Natural time range: "today", "yesterday", "this_week", etc.
+	ChatJID   string
+	Limit     int
+	Page      int
 }
 
 // SearchMessagesOptions contains options for searching messages.
+// Always includes ±2 surrounding messages for context.
 type SearchMessagesOptions struct {
-	Query  string
-	After  string
-	Before string
-	Limit  int
-	Page   int
+	Query     string
+	After     string
+	Before    string
+	Timeframe string // Natural time range: "today", "yesterday", "this_week", etc.
+	Limit     int
+	Page      int
+}
+
+// CatchUpOptions contains options for the catch_up composite tool.
+// Always includes media summary with standard detail level.
+type CatchUpOptions struct {
+	Timeframe  string // Natural time range: "last_hour", "today", "yesterday", etc.
+	OnlyGroups bool   // Only include group chat activity
+}
+
+// CatchUpSummary represents the result of a catch_up operation.
+type CatchUpSummary struct {
+	Timeframe      string           `json:"timeframe"`
+	Summary        string           `json:"summary"`
+	TotalMessages  int              `json:"total_messages"`
+	ActiveChats    []ActiveChatInfo `json:"active_chats"`
+	QuestionsForMe []Message        `json:"questions_for_me,omitempty"`
+	MediaSummary   *MediaSummary    `json:"media_summary,omitempty"`
+	NeedsAttention []string         `json:"needs_attention,omitempty"` // Chat names with unanswered questions
+}
+
+// ActiveChatInfo represents an active chat with recent activity.
+type ActiveChatInfo struct {
+	ChatJID         string    `json:"chat_jid"`
+	ChatName        string    `json:"chat_name"`
+	IsGroup         bool      `json:"is_group"`
+	MessageCount    int       `json:"message_count"`
+	LastMessageTime time.Time `json:"last_message_time"`
+	LastMessageText *string   `json:"last_message_text,omitempty"`
+	LastIsFromMe    bool      `json:"last_is_from_me"`
+	HasQuestions    bool      `json:"has_questions"`
+	RecentMessages  []Message `json:"recent_messages,omitempty"`
+}
+
+// MediaSummary represents media activity in a timeframe.
+type MediaSummary struct {
+	PhotoCount    int      `json:"photo_count"`
+	VideoCount    int      `json:"video_count"`
+	AudioCount    int      `json:"audio_count"`
+	DocumentCount int      `json:"document_count"`
+	FromChats     []string `json:"from_chats,omitempty"` // Chat names with media
 }

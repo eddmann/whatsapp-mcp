@@ -6,14 +6,15 @@ A Model Context Protocol (MCP) server for WhatsApp integration. Send messages, s
 
 ## Overview
 
-This MCP server provides 14 tools to interact with your WhatsApp account via the whatsmeow library:
+This MCP server provides 7 tools to interact with your WhatsApp account via the whatsmeow library:
 
-- Messaging (1 tool) - Send text and media messages (with fuzzy name matching)
-- Chats (5 tools) - List, search, and manage conversations and contacts
-- Messages (4 tools) - Retrieve message history with context and filtering
-- Search (1 tool) - Full-text search across all messages using SQLite FTS5
-- Media (1 tool) - Download and access media files from conversations
-- Status (1 tool) - Check connection status and server health
+- **list_chats** - List conversations with filtering, sorting, and pagination
+- **list_messages** - Retrieve message history with date range filtering and context
+- **search_messages** - Full-text search across all messages using SQLite FTS5 with context
+- **send_message** - Send text and media messages with fuzzy name matching and reply/threading
+- **download_media** - Download media files from conversations to local storage
+- **get_connection_status** - Check WhatsApp connection status and database statistics
+- **catch_up** - Intelligent activity summary showing recent chats, questions, and media
 
 All messages and chats are persisted to a local SQLite database with full-text search capabilities, enabling rich queries and analysis of your WhatsApp history.
 
@@ -159,44 +160,25 @@ Ask Claude to interact with your WhatsApp data using natural language.
 "Save that video Mick sent me yesterday"
 ```
 
+### Getting Activity Summaries
+
+```
+"Catch me up on today's WhatsApp activity"
+"Show me what happened in my WhatsApp groups this week"
+"What questions have I been asked today?"
+```
+
 ## Available Tools
 
-### Chat Management
-
-| Tool                         | Description                                                         |
-| ---------------------------- | ------------------------------------------------------------------- |
-| `list_chats`                 | List WhatsApp conversations with filtering, sorting, and pagination |
-| `get_chat`                   | Get detailed information about a specific chat by JID               |
-| `search_contacts`            | Search for contacts by name or phone number                         |
-| `get_direct_chat_by_contact` | Get direct message chat by phone number                             |
-| `get_contact_chats`          | List all chats (DMs and groups) involving a specific contact        |
-
-### Message Operations
-
-| Tool                   | Description                                                                 |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `list_messages`        | List messages with powerful filtering (date range, sender, chat, content)   |
-| `get_message_context`  | Get surrounding messages around a specific message for conversation context |
-| `get_last_interaction` | Get the most recent message with a specific contact                         |
-| `search_messages`      | Full-text search with FTS5, date filters, and advanced query operators      |
-
-### Messaging
-
-| Tool           | Description                                                                               |
-| -------------- | ----------------------------------------------------------------------------------------- |
-| `send_message` | Send text, media, or both to contacts/groups with fuzzy name matching and reply/threading |
-
-### Media
-
-| Tool             | Description                                                                      |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `download_media` | Download media files (image/video/audio/document) from messages to local storage |
-
-### Status
-
-| Tool                    | Description                                                            |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `get_connection_status` | Check WhatsApp connection status, login state, and database statistics |
+| Tool                    | Category     | Description                                                                                                                             |
+| ----------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_chats`            | Chats        | List conversations with message previews, sorted by recent activity. Filter by name/phone/groups-only. Supports pagination.             |
+| `list_messages`         | Messages     | List messages from a conversation. Filter by contact/group name and date range using natural timeframes (today, this_week, etc).        |
+| `search_messages`       | Search       | Full-text search with FTS5 across all messages. Supports keywords, phrases, boolean operators, and date filters.                        |
+| `send_message`          | Messaging    | Send text, media (image/video/audio/document), or both to contacts/groups. Fuzzy name matching and message reply/threading support.     |
+| `download_media`        | Media        | Download media files (image/video/audio/document) from messages to local storage organized by chat.                                     |
+| `get_connection_status` | Status       | Check WhatsApp connection status, login state, device info, and database statistics (chat and message counts).                          |
+| `catch_up`              | Intelligence | Intelligent activity summary showing active chats with recent messages, questions directed at you, media activity, and attention flags. |
 
 ## License
 

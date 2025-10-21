@@ -36,13 +36,11 @@ func (c *Client) handleMessage(msg *events.Message) {
 		}
 	}
 
-	// Determine and persist chat name
 	name := c.getChatName(msg.Info.Chat, chatJID, nil, sender)
 	if _, err := c.Store.Messages.Exec("INSERT OR REPLACE INTO chats (jid, name, last_message_time) VALUES (?, ?, ?)", chatJID, name, msg.Info.Timestamp); err != nil {
 		c.Logger.Warn("failed to upsert chat", "jid", chatJID, "err", err)
 	}
 
-	// Insert message
 	if _, err := c.Store.Messages.Exec(`INSERT OR REPLACE INTO messages
 		(id, chat_jid, sender, content, timestamp, is_from_me, media_type, filename, url, media_key, file_sha256, file_enc_sha256, file_length)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -71,10 +69,8 @@ func (c *Client) handleHistorySync(hs *events.HistorySync) {
 			continue
 		}
 
-		// Try to extract name from conversation; fallback to contacts/groups
 		name := c.getChatName(jid, chatJID, conv, "")
 
-		// Update chat last_message_time using latest message
 		if len(conv.Messages) > 0 && conv.Messages[0] != nil && conv.Messages[0].Message != nil {
 			ts := conv.Messages[0].Message.GetMessageTimestamp()
 			if ts != 0 {
@@ -85,13 +81,11 @@ func (c *Client) handleHistorySync(hs *events.HistorySync) {
 			}
 		}
 
-		// Store each message
 		for _, m := range conv.Messages {
 			if m == nil || m.Message == nil {
 				continue
 			}
 
-			// Text and media
 			var text string
 			if m.Message.Message != nil {
 				text = extractTextContent(m.Message.Message)
@@ -107,7 +101,6 @@ func (c *Client) handleHistorySync(hs *events.HistorySync) {
 				continue
 			}
 
-			// Sender and fromMe
 			fromMe := false
 			snd := jid.User
 			if m.Message.Key != nil {
@@ -122,7 +115,6 @@ func (c *Client) handleHistorySync(hs *events.HistorySync) {
 				}
 			}
 
-			// Normalize sender to phone user part if it looks like a JID (e.g. number@lid)
 			if strings.Contains(snd, "@") {
 				if pj, err := types.ParseJID(snd); err == nil {
 					snd = pj.User
@@ -149,7 +141,6 @@ func (c *Client) handleHistorySync(hs *events.HistorySync) {
 				}
 			}
 
-			// IDs and timestamp
 			id := ""
 			if m.Message.Key != nil && m.Message.Key.ID != nil {
 				id = *m.Message.Key.ID
@@ -161,7 +152,6 @@ func (c *Client) handleHistorySync(hs *events.HistorySync) {
 			}
 			t := time.Unix(int64(ts), 0)
 
-			// Persist
 			if _, err := c.Store.Messages.Exec(`INSERT OR REPLACE INTO messages
 				(id, chat_jid, sender, content, timestamp, is_from_me, media_type, filename, url, media_key, file_sha256, file_enc_sha256, file_length)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, chatJID, snd, text, t, fromMe, mt, fn, u, mk, sha, enc, fl); err != nil {

@@ -33,7 +33,6 @@ func New(db *store.DB, baseDir string, logLevel string, appLogger *slog.Logger) 
 		logLevel = "INFO"
 	}
 
-	// Normalize log level
 	lvl := strings.ToUpper(logLevel)
 	var zerologLevel zerolog.Level
 	switch lvl {
@@ -49,7 +48,6 @@ func New(db *store.DB, baseDir string, logLevel string, appLogger *slog.Logger) 
 		zerologLevel = zerolog.InfoLevel
 	}
 
-	// Create zerolog loggers that write to stderr
 	waZerolog := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05"}).
 		Level(zerologLevel).
 		With().
@@ -63,7 +61,6 @@ func New(db *store.DB, baseDir string, logLevel string, appLogger *slog.Logger) 
 		Str("module", "wa-db").
 		Logger()
 
-	// Wrap with waLog
 	waLogger := waLog.Zerolog(waZerolog)
 	dbLog := waLog.Zerolog(dbZerolog)
 
