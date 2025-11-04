@@ -1,5 +1,7 @@
 # WhatsApp MCP Server
 
+![WhatsApp MCP Server](docs/heading.png)
+
 A Model Context Protocol (MCP) server for WhatsApp integration. Send messages, search conversations, and access your WhatsApp history through Claude and other LLMs.
 
 [![Go 1.24+](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org/dl/)
