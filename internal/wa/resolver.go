@@ -39,7 +39,7 @@ func (c *Client) getChatName(jid types.JID, chatJID string, conversation any, se
 	}
 
 	if jid.Server == "g.us" {
-		if info, err := c.WA.GetGroupInfo(jid); err == nil && info.Name != "" {
+		if info, err := c.WA.GetGroupInfo(context.Background(), jid); err == nil && info.Name != "" {
 			return info.Name
 		}
 		return fmt.Sprintf("Group %s", jid.User)
@@ -69,7 +69,7 @@ func (c *Client) getChatName(jid types.JID, chatJID string, conversation any, se
 func (c *Client) resolvePreferredName(jid types.JID) string {
 	// Groups
 	if jid.Server == "g.us" {
-		if info, err := c.WA.GetGroupInfo(jid); err == nil && info.Name != "" {
+		if info, err := c.WA.GetGroupInfo(context.Background(), jid); err == nil && info.Name != "" {
 			return info.Name
 		}
 		return fmt.Sprintf("Group %s", jid.User)

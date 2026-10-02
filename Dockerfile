@@ -1,5 +1,5 @@
 # Multi-stage build for minimal final image with CGO support
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH

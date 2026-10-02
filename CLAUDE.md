@@ -239,7 +239,7 @@ The `send_message` tool supports three recipient formats:
 
 ## Prerequisites
 
-- Go 1.24+
+- Go 1.27+
 - macOS: Xcode Command Line Tools (`xcode-select --install`) for CGO
 - ffmpeg (optional but recommended for audio conversion): `brew install ffmpeg`
 
