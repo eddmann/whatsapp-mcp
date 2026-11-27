@@ -56,7 +56,7 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 - Registers 7 MCP tools covering chats, messages, search, messaging, media, and status
 - Handles graceful shutdown (SIGINT/SIGTERM) to disconnect WhatsApp and close DBs
 - Runs WhatsApp connection in background goroutine with QR authentication
-- Serves MCP over stdio using mark3labs/mcp-go
+- Serves MCP over stdio (default) or token-protected Streamable HTTP (`MCP_HTTP_ADDR`, see `cmd/whatsapp-mcp/http.go`) using mark3labs/mcp-go
 
 **Tools registered:**
 - Chat management: `list_chats`
@@ -167,6 +167,8 @@ CGO_ENABLED=1 go build -tags "sqlite_fts5" -o bin/whatsapp-mcp ./cmd/whatsapp-mc
 - `DB_DIR` (default: `store`): Directory for SQLite databases and downloaded media
 - `LOG_LEVEL` (default: `INFO`): Logging level (DEBUG, INFO, WARN, ERROR)
 - `FFMPEG_PATH` (default: `ffmpeg`): Path to ffmpeg binary for audio conversion
+- `MCP_HTTP_ADDR` (default: unset): when set (e.g. `:8787`), serve MCP over Streamable HTTP at `/mcp` instead of stdio, so multiple clients share one WhatsApp session
+- `MCP_AUTH_TOKEN`: bearer token (≥32 chars) required on every HTTP request; mandatory with `MCP_HTTP_ADDR`
 
 ### Storage Layout
 

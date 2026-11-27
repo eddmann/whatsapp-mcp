@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	mcp "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -366,8 +368,25 @@ func main() {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 
+	// MCP_HTTP_ADDR switches from stdio (one client) to Streamable HTTP, so
+	// several clients can share this single WhatsApp session.
+	var httpSrv *http.Server
+	if addr := os.Getenv("MCP_HTTP_ADDR"); addr != "" {
+		hs, err := newHTTPServer(srv, addr, os.Getenv("MCP_AUTH_TOKEN"), logger)
+		if err != nil {
+			logger.Error("invalid HTTP config", "err", err)
+			os.Exit(1)
+		}
+		httpSrv = hs
+	}
+
 	go func() {
 		<-sigc
+		if httpSrv != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = httpSrv.Shutdown(ctx)
+			cancel()
+		}
 		if waclient != nil && waclient.WA != nil && waclient.WA.IsConnected() {
 			waclient.WA.Disconnect()
 		}
@@ -376,7 +395,12 @@ func main() {
 	}()
 
 	go func() {
-		if err := server.ServeStdio(srv); err != nil {
+		if httpSrv != nil {
+			logger.Info("MCP HTTP listening", "addr", httpSrv.Addr, "path", "/mcp")
+			if err := serveHTTP(httpSrv); err != nil {
+				logger.Error("MCP HTTP error", "err", err)
+			}
+		} else if err := server.ServeStdio(srv); err != nil {
 			logger.Error("MCP stdio error", "err", err)
 		}
 		sigc <- syscall.SIGINT

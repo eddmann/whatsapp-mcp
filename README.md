@@ -113,6 +113,48 @@ Add to your configuration file:
 - `DB_DIR` - Directory for SQLite databases and downloaded media - default: `store`
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARN, ERROR) - default: `INFO`
 - `FFMPEG_PATH` - Path to ffmpeg binary for audio conversion - default: `ffmpeg`
+- `MCP_HTTP_ADDR` - If set (e.g. `:8787`), serve MCP over Streamable HTTP at `/mcp` instead of stdio - default: unset (stdio)
+- `MCP_AUTH_TOKEN` - Bearer token required on every HTTP request; at least 32 characters; required when `MCP_HTTP_ADDR` is set
+
+### Sharing One Session Between Multiple Clients (HTTP mode)
+
+Over stdio, each MCP client starts its own container, and only one container can safely use the store at a time: a second one fights over the SQLite files and the WhatsApp device session. To use WhatsApp from several clients or sessions at once (e.g. Claude Desktop, Claude Code and Cursor), run **one** long-lived container in HTTP mode and point every client at it.
+
+```bash
+TOKEN=$(openssl rand -base64 32)
+docker run -d --name whatsapp-mcp --restart unless-stopped \
+  -p 127.0.0.1:8787:8787 \
+  -e MCP_HTTP_ADDR=:8787 -e MCP_AUTH_TOKEN="$TOKEN" \
+  -v ~/.whatsapp-mcp/store:/app/store \
+  ghcr.io/eddmann/whatsapp-mcp:latest
+```
+
+Publish the port on `127.0.0.1` only. Every request must send `Authorization: Bearer <token>`; this keeps out other local processes and DNS-rebinding attacks from browser pages. `GET /healthz` (no auth) returns 204 for health checks.
+
+Clients that support remote MCP servers connect directly, e.g. Claude Code:
+
+```bash
+claude mcp add --transport http whatsapp http://127.0.0.1:8787/mcp --header "Authorization: Bearer $TOKEN"
+```
+
+Clients that can only launch stdio servers (such as Claude Desktop's `mcpServers` config) can use the dependency-free bridge in `scripts/mcp-http-bridge.py` (Python 3.9+). It reads the token from a file, so the token never appears in the client config:
+
+```json
+{
+  "mcpServers": {
+    "whatsapp": {
+      "command": "/usr/bin/python3",
+      "args": ["/path/to/mcp-http-bridge.py"],
+      "env": {
+        "WHATSAPP_MCP_URL": "http://127.0.0.1:8787/mcp",
+        "WHATSAPP_MCP_TOKEN_FILE": "/Users/you/.whatsapp-mcp/token"
+      }
+    }
+  }
+}
+```
+
+If the server restarts, the bridge sets up a new session on its own.
 
 ## Usage
 
